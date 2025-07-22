@@ -58,22 +58,68 @@ export default function Transactions() {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('transactions')
-        .select('*')
+      
+      // Buscar receitas da tabela income_sources
+      const { data: incomeData, error: incomeError } = await supabase
+        .from('income_sources')
+        .select('id, name, amount, category, next_payment, created_at, updated_at')
         .eq('user_id', user?.id)
-        .gte('date', startDate)
-        .lte('date', endDate + 'T23:59:59.999Z') // Incluir o dia completo
-        .order('date', { ascending: false });
+        .eq('frequency', 'one-time') // Apenas transações únicas
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59.999Z');
 
-      if (selectedType !== 'all') {
-        query = query.eq('type', selectedType);
+      if (incomeError) {
+        console.error('Income error:', incomeError);
       }
 
-      const { data, error: fetchError } = await query;
+      // Buscar despesas da tabela expenses  
+      const { data: expenseData, error: expenseError } = await supabase
+        .from('expenses')
+        .select('id, name, amount, category, created_at, updated_at')
+        .eq('user_id', user?.id)
+        .eq('frequency', 'one-time') // Apenas transações únicas
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59.999Z');
 
-      if (fetchError) throw fetchError;
-      setTransactions(data || []);
+      if (expenseError) {
+        console.error('Expense error:', expenseError);
+      }
+
+      // Transformar dados para o formato de Transaction
+      const incomeTransactions: Transaction[] = (incomeData || []).map(item => ({
+        id: item.id,
+        type: 'income' as const,
+        amount: item.amount,
+        category: item.category || 'Sem categoria',
+        description: item.name,
+        date: item.next_payment || item.created_at,
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }));
+
+      const expenseTransactions: Transaction[] = (expenseData || []).map(item => ({
+        id: item.id,
+        type: 'expense' as const,
+        amount: item.amount,
+        category: item.category || 'Sem categoria',
+        description: item.name,
+        date: item.created_at, // Para expenses, usar created_at como data da transação
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }));
+
+      // Combinar e ordenar por data
+      let allTransactions = [...incomeTransactions, ...expenseTransactions];
+      
+      // Filtrar por tipo se necessário
+      if (selectedType !== 'all') {
+        allTransactions = allTransactions.filter(t => t.type === selectedType);
+      }
+
+      // Ordenar por data (mais recente primeiro)
+      allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setTransactions(allTransactions);
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setError('Erro ao carregar transações');
@@ -84,14 +130,35 @@ export default function Transactions() {
 
   const handleAddTransaction = async (transactionData: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .insert([{
-          ...transactionData,
-          user_id: user?.id,
-        }]);
+      if (transactionData.type === 'income') {
+        // Salvar receitas na tabela income_sources
+        const { error } = await supabase
+          .from('income_sources')
+          .insert([{
+            user_id: user?.id,
+            name: transactionData.description,
+            amount: transactionData.amount,
+            frequency: 'one-time', // Transações são sempre únicas
+            category: transactionData.category,
+            is_active: true
+          }]);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Salvar despesas na tabela expenses
+        const { error } = await supabase
+          .from('expenses')
+          .insert([{
+            user_id: user?.id,
+            name: transactionData.description,
+            amount: transactionData.amount,
+            frequency: 'one-time', // Transações são sempre únicas
+            category: transactionData.category,
+            is_active: true
+          }]);
+
+        if (error) throw error;
+      }
       
       setShowAddModal(false);
       fetchTransactions();
@@ -116,15 +183,36 @@ export default function Transactions() {
     if (!editingId) return;
 
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .update({
-          ...editForm,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingId);
+      const transaction = transactions.find(t => t.id === editingId);
+      if (!transaction) return;
 
-      if (error) throw error;
+      if (transaction.type === 'income') {
+        // Atualizar na tabela income_sources
+        const { error } = await supabase
+          .from('income_sources')
+          .update({
+            name: editForm.description,
+            amount: editForm.amount,
+            category: editForm.category,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingId);
+
+        if (error) throw error;
+      } else {
+        // Atualizar na tabela expenses
+        const { error } = await supabase
+          .from('expenses')
+          .update({
+            name: editForm.description,
+            amount: editForm.amount,
+            category: editForm.category,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingId);
+
+        if (error) throw error;
+      }
       
       setEditingId(null);
       setEditForm({});
@@ -144,12 +232,27 @@ export default function Transactions() {
     if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
 
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('id', id);
+      const transaction = transactions.find(t => t.id === id);
+      if (!transaction) return;
 
-      if (error) throw error;
+      if (transaction.type === 'income') {
+        // Deletar da tabela income_sources
+        const { error } = await supabase
+          .from('income_sources')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+      } else {
+        // Deletar da tabela expenses
+        const { error } = await supabase
+          .from('expenses')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+      }
+
       fetchTransactions();
     } catch (err) {
       console.error('Error deleting transaction:', err);

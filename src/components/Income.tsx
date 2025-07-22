@@ -216,7 +216,7 @@ export default function Income() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this income source?')) return;
+    if (!confirm('Tem certeza que deseja excluir esta fonte de renda?')) return;
 
     try {
       const { error } = await supabase
@@ -239,6 +239,7 @@ export default function Income() {
     }).format(amount);
   };
 
+  // Calcular total de receita - INCLUINDO transações únicas (igual ao RevenueManagement)
   const calculateTotalIncome = () => {
     return incomeSources.reduce((total, source) => {
       if (!source.is_active) return total;
@@ -252,7 +253,8 @@ export default function Income() {
           monthlyAmount = source.amount / 12;
           break;
         case 'one-time':
-          monthlyAmount = 0;
+          // INCLUIR transações únicas (igual ao Dashboard e RevenueManagement)
+          monthlyAmount = source.amount;
           break;
       }
       return total + monthlyAmount;
@@ -297,7 +299,7 @@ export default function Income() {
             <div className="flex-1">
               <p className="text-white/80 text-sm font-medium">Renda Mensal Total</p>
               <p className="text-3xl font-bold mt-1">{formatCurrency(calculateTotalIncome())}</p>
-              
+              <p className="text-white/80 text-xs mt-1">Incluindo transações únicas</p>
             </div>
             <div className="bg-white/20 p-3 rounded-lg">
               <TrendingUp className="h-6 w-6" />
@@ -312,7 +314,8 @@ export default function Income() {
               <p className="text-3xl font-bold mt-1">{incomeSources.filter(s => s.is_active).length}</p>
               <p className="text-white/80 text-sm">
                 {incomeSources.filter(s => s.frequency === 'monthly' && s.is_active).length} mensais, 
-                {incomeSources.filter(s => s.frequency === 'yearly' && s.is_active).length} anuais
+                {incomeSources.filter(s => s.frequency === 'yearly' && s.is_active).length} anuais, 
+                {incomeSources.filter(s => s.frequency === 'one-time' && s.is_active).length} únicas
               </p>
             </div>
             <div className="bg-white/20 p-3 rounded-lg">
@@ -436,9 +439,14 @@ export default function Income() {
                                 <p>Imposto: {income.tax_rate}%</p>
                               </div>
                             )}
-                            {income.next_payment && (
+                            {income.next_payment && income.frequency !== 'one-time' && (
                               <div className="text-sm text-gray-600">
                                 <p>Próximo: {new Date(income.next_payment).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                            )}
+                            {income.next_payment && income.frequency === 'one-time' && (
+                              <div className="text-sm text-gray-600">
+                                <p>Data: {new Date(income.next_payment).toLocaleDateString('pt-BR')}</p>
                               </div>
                             )}
                           </div>

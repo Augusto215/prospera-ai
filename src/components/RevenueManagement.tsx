@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Plus, Edit, Trash2, TrendingUp, Home, Building, Receipt, Save, X, Landmark } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, TrendingUp, Home, Building, Receipt, Save, X, Landmark, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import DateRangeSelector from './DateRangeSelector';
@@ -71,7 +71,7 @@ export default function RevenueManagement() {
 
       setIncomeSources(allIncomeSources);
       
-      // Calcular total mensal corrigido
+      // Calcular total mensal - INCLUINDO transações únicas do período (igual ao Dashboard)
       const total = allIncomeSources
         .filter(source => source.is_active)
         .reduce((sum, source) => {
@@ -85,7 +85,8 @@ export default function RevenueManagement() {
               monthlyAmount = source.amount / 12;
               break;
             case 'one-time':
-              monthlyAmount = 0;
+              // INCLUIR transações únicas que estão no período selecionado
+              monthlyAmount = source.amount;
               break;
             default:
               monthlyAmount = source.amount;
@@ -274,7 +275,7 @@ export default function RevenueManagement() {
     return totalMonthlyIncome * 12;
   };
 
-  // Calcular renda por categoria
+  // Calcular renda por categoria - INCLUINDO transações únicas (igual ao Dashboard)
   const calculateIncomeByCategory = () => {
     const categories: Record<string, number> = {};
     
@@ -291,7 +292,8 @@ export default function RevenueManagement() {
             monthlyAmount = source.amount / 12;
             break;
           case 'one-time':
-            monthlyAmount = 0;
+            // INCLUIR transações únicas que estão no período selecionado
+            monthlyAmount = source.amount;
             break;
           default:
             monthlyAmount = source.amount;
@@ -388,16 +390,34 @@ export default function RevenueManagement() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Period Info - igual ao Dashboard e outros componentes */}
+      {incomeSources.length > 0 ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-blue-600" />
+            <span className="text-sm text-blue-800 font-medium">
+              Receitas do período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')} (incluindo transações únicas)
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-yellow-600" />
+            <span className="text-sm text-yellow-800 font-medium">
+              Nenhuma receita no período ({new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}). Tente selecionar um período diferente.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Summary Cards - limpos sem informação de período */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-2xl text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-100 text-sm font-medium">Renda Mensal</p>
               <p className="text-3xl font-bold mt-1">{formatCurrency(totalMonthlyIncome)}</p>
-              <p className="text-green-100 text-xs mt-1">
-                Período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
-              </p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <DollarSign className="h-6 w-6" />
@@ -410,9 +430,6 @@ export default function RevenueManagement() {
             <div>
               <p className="text-blue-100 text-sm font-medium">Renda Anual</p>
               <p className="text-3xl font-bold mt-1">{formatCurrency(calculateTotalYearlyIncome())}</p>
-              <p className="text-blue-100 text-xs mt-1">
-                Baseado no período selecionado
-              </p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <TrendingUp className="h-6 w-6" />
@@ -793,9 +810,14 @@ export default function RevenueManagement() {
                               Imposto: {formatCurrency((source.amount * source.tax_rate) / 100)}
                             </p>
                           )}
-                          {source.next_payment && (
+                          {source.next_payment && source.frequency !== 'one-time' && (
                             <p className="text-sm text-blue-600">
                               Próximo: {new Date(source.next_payment).toLocaleDateString('pt-BR')}
+                            </p>
+                          )}
+                          {source.next_payment && source.frequency === 'one-time' && (
+                            <p className="text-sm text-gray-600">
+                              Data: {new Date(source.next_payment).toLocaleDateString('pt-BR')}
                             </p>
                           )}
                         </div>

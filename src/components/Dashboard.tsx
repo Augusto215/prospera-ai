@@ -95,7 +95,7 @@ export default function Dashboard() {
         (expenseResult.data && expenseResult.data.length > 0);
 
       if (hasFilteredData) {
-        // Calcular apenas receitas e despesas do período
+        // Calcular receitas e despesas do período - INCLUINDO transações únicas do período
         const totalMonthlyIncome = (incomeResult.data || []).reduce((sum: number, income: any) => {
           let monthlyAmount = income.amount;
           switch (income.frequency) {
@@ -106,7 +106,8 @@ export default function Dashboard() {
               monthlyAmount = income.amount / 12;
               break;
             case 'one-time':
-              monthlyAmount = 0;
+              // INCLUIR transações únicas que estão no período selecionado
+              monthlyAmount = income.amount;
               break;
           }
           return sum + monthlyAmount;
@@ -122,7 +123,8 @@ export default function Dashboard() {
               monthlyAmount = expense.amount / 12;
               break;
             case 'one-time':
-              monthlyAmount = 0;
+              // INCLUIR transações únicas que estão no período selecionado
+              monthlyAmount = expense.amount;
               break;
           }
           return sum + monthlyAmount;
@@ -206,7 +208,7 @@ export default function Dashboard() {
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-blue-600" />
             <span className="text-sm text-blue-800 font-medium">
-              Receitas/Despesas filtradas do período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
+              Receitas/Despesas filtradas do período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')} (incluindo transações únicas)
             </span>
           </div>
         </div>
@@ -287,7 +289,7 @@ export default function Dashboard() {
               </li>
               <li className="flex items-center">
                 <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full mr-1 sm:mr-2"></span>
-                <a href="/bills" className="hover:underline">Contas a Pagar</a>
+                <a href="/transactions" className="hover:underline">Transações</a>
               </li>
             </ul>
           </div>
@@ -473,7 +475,6 @@ export default function Dashboard() {
         </div>
         
       </div>
-
 
       {/* Debt Overview */}
       <div className="bg-white rounded-xl shadow-md p-6">
