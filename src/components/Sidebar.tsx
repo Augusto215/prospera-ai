@@ -85,6 +85,10 @@ const otherSections = [
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { user, signOut, isAdmin, userPlan, isInTrial, trialDaysLeft } = useAuth();
+  // Detecta se está na rota admin
+  const isAdminRoute = window.location.pathname.includes('/admin');
+  // Se for admin ou rota admin, libera tudo
+  const effectivePlan = isAdmin || isAdminRoute ? 'family' : userPlan;
   const [showUpgradeModal, setShowUpgradeModal] = useState(false); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -140,33 +144,29 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   const handleTabClick = (tabId: string, isRestricted: boolean) => {
     // If trial days left is 0, only allow subscription tab
-    if (!isAdmin && trialDaysLeft === 0 && tabId !== 'subscription' && tabId !== 'profile') {
+    if (!isAdmin && !isAdminRoute && trialDaysLeft === 0 && tabId !== 'subscription' && tabId !== 'profile') {
       setActiveTab('subscription');
       return;
     }
-    
-    if (isRestricted && userPlan === 'starter') {
-      // Get the feature name from the tab ID
-      const feature = 
-        patrimonySections.find(s => s.id === tabId)?.label || 
-        otherSections.find(s => s.id === tabId)?.label ||
-        mainSections.find(s => s.id === tabId)?.label;
-      
-      setRestrictedFeature(feature);
-      setShowUpgradeModal(true);
-      return;
-    }
-    
-    if (!isRestricted || userPlan === 'family') {
+    // Se for admin ou rota admin, ignora restrições
+    if ((isAdmin || isAdminRoute) || !isRestricted || effectivePlan === 'family') {
       setActiveTab(tabId);
-      
-      // Se está abrindo os alertas, atualizar o contador
       if (tabId === 'smart-alerts') {
-        // Pequeno delay para permitir que o componente SmartAlerts marque os alertas como lidos
         setTimeout(() => {
           fetchUnreadAlertsCount();
         }, 1000);
       }
+      return;
+    }
+    // Se for restrito e plano starter, mostra modal
+    if (isRestricted && effectivePlan === 'starter') {
+      const feature = 
+        patrimonySections.find(s => s.id === tabId)?.label || 
+        otherSections.find(s => s.id === tabId)?.label ||
+        mainSections.find(s => s.id === tabId)?.label;
+      setRestrictedFeature(feature);
+      setShowUpgradeModal(true);
+      return;
     }
   };
 
@@ -184,8 +184,8 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       <div className="space-y-1 pl-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const isRestricted = item.restricted && userPlan === 'starter';
-          
+          // Se for admin ou rota admin, nunca bloqueia
+          const isRestricted = item.restricted && effectivePlan === 'starter' && !(isAdmin || isAdminRoute);
           return (
             <button
               key={item.id}
@@ -260,7 +260,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         <div className="space-y-1">
           {mainSections.map((item) => {
             const Icon = item.icon;
-            const isRestricted = item.restricted && userPlan === 'starter'; 
+            const isRestricted = item.restricted && effectivePlan === 'starter' && !(isAdmin || isAdminRoute);
             
             // Add notification badge for smart alerts
             const showNotificationBadge = item.id === 'smart-alerts';
@@ -278,6 +278,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                 }`}
                 disabled={isRestricted && userPlan === 'starter'}
+               disabled={isRestricted && effectivePlan === 'starter' && !(isAdmin || isAdminRoute)}
               >
                 <div className="flex items-center space-x-3">
                   <Icon className="h-4 w-4" />

@@ -24,8 +24,8 @@ class OpenAIService {
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage }
         ],
-        max_tokens: 500, // Aumentado de 300 para 500
-        temperature: 0.7,
+        max_tokens: 500,
+        temperature: 0.7
       };
 
       const response = await fetch(this.baseUrl, {

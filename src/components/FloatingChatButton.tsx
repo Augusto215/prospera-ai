@@ -420,9 +420,6 @@ ${userData.totalDebt > 0 ? '1. Reduzir dívidas\n' : ''}${userData.investmentVal
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm">Assistente IA</h3>
-                  <p className="text-xs text-white/80">
-                    {isTyping ? 'Analisando...' : userFinancialData ? 'Com seus dados' : 'Carregando perfil...'}
-                  </p>
                 </div>
               </div>
               <button

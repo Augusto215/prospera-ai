@@ -20,6 +20,28 @@ import { useAuth } from '../contexts/AuthContext';
 
 
 export default function AIInsights() {
+  // Função para aplicar sugestão
+  // Corrige: feedback visual e atualização de recomendações sem reload total
+  const applyRecommendation = async (recId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Chama função serverless para aplicar recomendação
+      const { data, error: apiError } = await supabase.functions.invoke('apply-recommendation', {
+        body: { userId: user?.id, recommendationId: recId }
+      });
+      if (apiError) throw apiError;
+      if (data && (data.error || data.status === 'error')) throw new Error(data.error || data.message || 'Erro desconhecido');
+      // Atualiza insights e recomendações via nova consulta (garante consistência)
+      await generateInsights();
+      setError('Sugestão aplicada com sucesso!');
+      setTimeout(() => setError(null), 2000);
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao aplicar sugestão. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'warning' | 'suggestion' | 'achievement' | 'feature'>('all');
   const [insights, setInsights] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -240,7 +262,8 @@ export default function AIInsights() {
           {['all', 'feature', 'warning', 'suggestion', 'achievement'].map((filter) => (
             <button
               key={filter}
-              className="mt-3 w-full py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 shadow-md flex items-center justify-center space-x-2"
+              type="button"
+              onClick={() => setSelectedFilter(filter as typeof selectedFilter)}
               className={`px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
                 selectedFilter === filter
                   ? 'bg-blue-600 text-white shadow-md'
@@ -333,27 +356,30 @@ export default function AIInsights() {
                           {insight.type === 'suggestion' && (
                             <button 
                               onClick={() => {
-                                // Handle suggestion application
-                                if (insight.id.startsWith('rec-')) {
                                   const recId = insight.id.replace('rec-', '');
                                   applyRecommendation(recId);
-                                }
-                              }}
+                                }}
                               className="px-3 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors duration-200 hover:bg-blue-700"
+                              type="button"
                             >
                               Aplicar Sugestão
                             </button>
                           )}
-                          {insight.action_path && (
+                          {insight.action_path ? (
                             <a 
                               href={insight.action_path} 
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition-colors duration-200"
                             >
                               {insight.action_label || 'Ver Detalhes'}
                             </a>
-                          )}
-                          {!insight.action_path && (
-                            <button className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition-colors duration-200">
+                          ) : (
+                            <button 
+                              type="button"
+                              onClick={() => alert(insight.description)}
+                              className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition-colors duration-200"
+                            >
                               Ver Detalhes
                             </button>
                           )}
