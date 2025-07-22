@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Plus, Edit2, Trash2, TrendingUp, Home, Building, Receipt, Save, X, Landmark } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, TrendingUp, Home, Building, Receipt, Save, X, Landmark } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import DateRangeSelector from './DateRangeSelector';
@@ -805,7 +805,7 @@ export default function RevenueManagement() {
                             onClick={() => handleEdit(source)}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
                           >
-                            <Edit2 className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(source.id)}

@@ -23,7 +23,6 @@ interface Transaction {
   category: string;
   description: string;
   date: string;
-  is_recurring: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -38,15 +37,18 @@ export default function Transactions() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
+  
+  // Configuração inicial das datas - igual ao RevenueManagement e Investments
   const [startDate, setStartDate] = useState<string>(() => {
     const date = new Date();
-    date.setDate(1); // First day of current month
+    date.setDate(date.getDate() - 30);
     return date.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
 
+  // useEffect com dependências das datas - igual aos outros componentes
   useEffect(() => {
     if (user) {
       fetchTransactions();
@@ -61,7 +63,7 @@ export default function Transactions() {
         .select('*')
         .eq('user_id', user?.id)
         .gte('date', startDate)
-        .lte('date', endDate)
+        .lte('date', endDate + 'T23:59:59.999Z') // Incluir o dia completo
         .order('date', { ascending: false });
 
       if (selectedType !== 'all') {
@@ -106,8 +108,7 @@ export default function Transactions() {
       amount: transaction.amount,
       category: transaction.category,
       description: transaction.description,
-      date: transaction.date,
-      is_recurring: transaction.is_recurring
+      date: transaction.date
     });
   };
 
@@ -177,17 +178,15 @@ export default function Transactions() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header com DateRangeSelector - igual aos outros componentes */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Transações</h1>
@@ -195,6 +194,8 @@ export default function Transactions() {
         </div>
         <div className="flex space-x-3">
           <DateRangeSelector 
+            startDate={startDate}
+            endDate={endDate}
             onRangeChange={(start, end) => {
               setStartDate(start);
               setEndDate(end);
@@ -216,7 +217,28 @@ export default function Transactions() {
         </div>
       )}
 
-      {/* Resumo */}
+      {/* Period Info - igual ao Dashboard e Investments */}
+      {transactions.length > 0 ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-blue-600" />
+            <span className="text-sm text-blue-800 font-medium">
+              Transações do período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-yellow-600" />
+            <span className="text-sm text-yellow-800 font-medium">
+              Nenhuma transação no período ({new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}). Tente selecionar um período diferente.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Resumo - cards limpos sem informação do período */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <div className="bg-green-600 p-4 sm:p-6 rounded-xl text-white shadow-md">
           <div className="flex items-center justify-between">
@@ -287,7 +309,12 @@ export default function Transactions() {
       {/* Lista de transações */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-gray-100">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Suas Transações</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Suas Transações</h2>
+            <div className="text-sm text-gray-500">
+              Período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
+            </div>
+          </div>
         </div>
         
         <div className="divide-y divide-gray-100">
@@ -295,7 +322,18 @@ export default function Transactions() {
             <div className="p-8 sm:p-12 text-center">
               <Receipt className="h-10 sm:h-12 w-10 sm:w-12 text-gray-300 mx-auto mb-4" />
               <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Nenhuma transação encontrada</h3>
-              <p className="text-sm sm:text-base text-gray-500">Adicione transações para acompanhar suas finanças.</p>
+              <p className="text-sm sm:text-base text-gray-500">
+                {searchTerm ? 
+                  `Nenhuma transação corresponde à busca "${searchTerm}" no período selecionado.` :
+                  `Não há transações no período de ${new Date(startDate).toLocaleDateString('pt-BR')} - ${new Date(endDate).toLocaleDateString('pt-BR')}`
+                }
+              </p>
+              <p className="text-gray-400 text-sm mt-2">
+                {searchTerm ? 
+                  'Tente um termo de busca diferente ou limpe o filtro.' :
+                  'Tente selecionar um período diferente ou adicione uma nova transação.'
+                }
+              </p>
             </div>
           ) : (
             filteredTransactions.map((transaction) => (
@@ -307,7 +345,7 @@ export default function Transactions() {
                       <select
                         value={editForm.type || ''}
                         onChange={(e) => setEditForm({ ...editForm, type: e.target.value as 'income' | 'expense' })}
-                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base"
+                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base bg-white text-black"
                       >
                         <option value="income">Receita</option>
                         <option value="expense">Despesa</option>
@@ -316,7 +354,7 @@ export default function Transactions() {
                         type="number"
                         value={editForm.amount || ''}
                         onChange={(e) => setEditForm({ ...editForm, amount: Number(e.target.value) })}
-                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base"
+                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base bg-white text-black"
                         placeholder="Valor"
                         step="0.01"
                       />
@@ -325,7 +363,7 @@ export default function Transactions() {
                       type="text"
                       value={editForm.description || ''}
                       onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base"
+                      className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base bg-white text-black"
                       placeholder="Descrição"
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -333,37 +371,31 @@ export default function Transactions() {
                         type="text"
                         value={editForm.category || ''}
                         onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base"
+                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base bg-white text-black"
                         placeholder="Categoria"
                       />
                       <input
                         type="date"
                         value={editForm.date || ''}
                         onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base"
+                        className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base bg-white text-black"
                       />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={editForm.is_recurring || false}
-                        onChange={(e) => setEditForm({ ...editForm, is_recurring: e.target.checked })}
-                        className="rounded text-blue-600"
-                      />
-                      <span className="text-gray-700 text-sm sm:text-base">Recorrente</span>
-                    </div>
-                    <div className="flex items-center justify-end space-x-2">
+                    
+                    <div className="flex items-center justify-end space-x-3 pt-2">
                       <button
-                        onClick={handleSaveEdit}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors duration-200"
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors duration-200 text-sm font-medium"
                       >
-                        <Save className="h-4 w-4" />
+                        Cancelar
                       </button>
                       <button
-                        onClick={handleCancelEdit}
-                        className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors duration-200"
+                        type="button"
+                        onClick={handleSaveEdit}
+                        className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-200 shadow-sm text-sm font-medium"
                       >
-                        <X className="h-4 w-4" />
+                        Salvar
                       </button>
                     </div>
                   </div>
@@ -389,14 +421,6 @@ export default function Transactions() {
                           <span className="text-xs sm:text-sm text-gray-500">
                             {new Date(transaction.date).toLocaleDateString('pt-BR')}
                           </span>
-                          {transaction.is_recurring && (
-                            <>
-                              <span className="text-gray-300 hidden sm:inline">•</span>
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                                Recorrente
-                              </span>
-                            </>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -414,14 +438,12 @@ export default function Transactions() {
                           className="px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200 flex items-center"
                         >
                           <Edit className="h-4 w-4" />
-                          <span className="ml-1 text-xs sm:text-sm">Editar</span>
                         </button>
                         <button 
                           onClick={() => handleDeleteTransaction(transaction.id)}
                           className="px-3 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200 flex items-center"
                         >
                           <Trash2 className="h-4 w-4" />
-                          <span className="ml-1 text-xs sm:text-sm">Excluir</span>
                         </button>
                       </div>
                     </div>
@@ -449,8 +471,7 @@ export default function Transactions() {
                 amount: Number(formData.get('amount')),
                 category: formData.get('category') as string,
                 description: formData.get('description') as string,
-                date: formData.get('date') as string,
-                is_recurring: formData.has('is_recurring'),
+                date: formData.get('date') as string
               });
             }} className="p-4 sm:p-6 space-y-4">
               <select
@@ -494,12 +515,7 @@ export default function Transactions() {
                 required
                 className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm sm:text-base bg-white text-black"
               />
-              
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input type="checkbox" name="is_recurring" className="rounded text-blue-600" />
-                <span className="text-gray-700 text-sm sm:text-base">Transação recorrente</span>
-              </label>
-              
+                            
               <div className="flex space-x-3 pt-4">
                 <button
                   type="button"

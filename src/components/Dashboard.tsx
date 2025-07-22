@@ -31,6 +31,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeBreakdown, setActiveBreakdown] = useState<string | null>(null);
+  const breakdownRef = React.useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -171,6 +172,14 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // Função para ativar breakdown e rolar para o conteúdo
+  const handleShowBreakdown = (type: string) => {
+    setActiveBreakdown(type);
+    setTimeout(() => {
+      breakdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100); // aguarda renderização
+  };
 
   return (
     <div className="space-y-6">
@@ -463,18 +472,12 @@ export default function Dashboard() {
           </button>
         </div>
         
-        {/* Detailed breakdown */}
-        {activeBreakdown && (
-          <div className="mt-4 sm:mt-6 bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-            <FinancialBreakdown type={activeBreakdown} />
-          </div>
-        )}
       </div>
+
 
       {/* Debt Overview */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-6">Visão Geral de Dívidas</h2>
-        
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
           <div className="bg-white p-4 rounded-xl border border-red-200">
             <div className="flex items-center space-x-3 mb-3">
@@ -484,7 +487,6 @@ export default function Dashboard() {
             <p className="text-2xl font-bold text-red-600">{formatCurrency(dashboardData.totalDebt || 0)}</p>
             <p className="text-sm text-gray-500 mt-1">Pagamento: {formatCurrency(dashboardData.totalLoanPayments || 0)}/mês</p>
           </div>
-          
           <div className="bg-white p-4 rounded-xl border border-orange-200">
             <div className="flex items-center space-x-3 mb-3">
               <FileText className="h-5 w-5 text-orange-600" />
@@ -492,7 +494,6 @@ export default function Dashboard() {
             </div>
             <p className="text-2xl font-bold text-orange-600">{formatCurrency(dashboardData.totalBills || 0)}</p>
           </div>
-          
           <div className="bg-white p-4 rounded-xl border border-indigo-200">
             <div className="flex items-center space-x-3 mb-3">
               <Landmark className="h-5 w-5 text-indigo-600" />
@@ -500,25 +501,18 @@ export default function Dashboard() {
             </div>
             <p className="text-2xl font-bold text-indigo-600">{formatCurrency(dashboardData.totalTaxes || 0)}</p>
             <button
-              onClick={() => setActiveBreakdown(activeBreakdown === 'taxes' ? null : 'taxes')}
+              onClick={() => activeBreakdown === 'taxes' ? setActiveBreakdown(null) : handleShowBreakdown('taxes')}
               className="text-xs text-indigo-600 mt-2 hover:underline"
             >
               Ver detalhes
             </button>
           </div>
         </div>
-        
-        {activeBreakdown === 'taxes' && (
-          <div className="mt-6 bg-white border border-gray-200 rounded-xl p-4">
-            <FinancialBreakdown type="taxes" />
-          </div>
-        )}
       </div>
 
       {/* Net Worth */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-6">Patrimônio Líquido</h2>
-        
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
           <div className="bg-white p-4 rounded-xl border border-green-200">
             <div className="flex items-center space-x-3 mb-3">
@@ -527,7 +521,6 @@ export default function Dashboard() {
             </div>
             <p className="text-2xl font-bold text-green-600">{formatCurrency(dashboardData.totalAssets || 0)}</p>
           </div>
-          
           <div className="bg-white p-4 rounded-xl border border-red-200">
             <div className="flex items-center space-x-3 mb-3">
               <TrendingDown className="h-5 w-5 text-red-600" />
@@ -535,7 +528,6 @@ export default function Dashboard() {
             </div>
             <p className="text-2xl font-bold text-red-600">{formatCurrency(dashboardData.totalDebt || 0)}</p>
           </div>
-          
           <div className="bg-white p-4 rounded-xl border border-blue-200">
             <div className="flex items-center space-x-3 mb-3">
               <DollarSign className="h-5 w-5 text-blue-600" />
@@ -543,20 +535,30 @@ export default function Dashboard() {
             </div>
             <p className="text-2xl font-bold text-blue-600">{formatCurrency(dashboardData.netWorth || 0)}</p>
             <button
-              onClick={() => setActiveBreakdown(activeBreakdown === 'balance' ? null : 'balance')}
+              onClick={() => activeBreakdown === 'balance' ? setActiveBreakdown(null) : handleShowBreakdown('balance')}
               className="text-xs text-blue-600 mt-2 hover:underline"
             >
               Ver detalhes
             </button>
           </div>
         </div>
-        
-        {activeBreakdown === 'balance' && (
-          <div className="mt-6 bg-white border border-gray-200 rounded-xl p-4">
-            <FinancialBreakdown type="balance" />
-          </div>
-        )}
       </div>
+
+      {/* Render only one breakdown section at the bottom */}
+      {activeBreakdown && (
+        <div ref={breakdownRef} className="mt-6 bg-white border border-gray-200 rounded-xl p-4 relative">
+          <button
+            onClick={() => setActiveBreakdown(null)}
+            className="absolute top-3 right-3 p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
+            title="Fechar detalhes"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <FinancialBreakdown type={activeBreakdown} />
+        </div>
+      )}
     </div>
   );
 }

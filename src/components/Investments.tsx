@@ -44,14 +44,17 @@ export default function Investments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string>('');
+  
+  // Configuração inicial das datas - igual ao RevenueManagement
   const [startDate, setStartDate] = useState<string>(() => {
     const date = new Date();
-    date.setDate(date.getDate() - 90);
+    date.setDate(date.getDate() - 30);
     return date.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
+  
   const [formData, setFormData] = useState({
     quantity: '',
     current_price: '',
@@ -145,6 +148,7 @@ export default function Investments() {
     }
   };
 
+  // useEffect com dependências das datas - igual ao RevenueManagement
   useEffect(() => {
     if (user) {
       fetchInvestments();
@@ -181,15 +185,17 @@ export default function Investments() {
     }
   }, [selectedType]);
 
+  // Função fetchInvestments modificada para usar filtragem por data - igual ao RevenueManagement
   const fetchInvestments = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
+      // Buscar investimentos com filtro de data baseado na purchase_date
       const { data, error } = await supabase
         .from('investments')
         .select('id, name, type, broker, amount, purchase_price, current_price, interest_rate, monthly_income, purchase_date, maturity_date, quantity, dividend_yield, tax_rate, created_at, updated_at')
         .eq('user_id', user?.id)
         .gte('purchase_date', startDate)
-        .lte('purchase_date', endDate)
+        .lte('purchase_date', endDate + 'T23:59:59.999Z') // Incluir o dia completo
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -352,17 +358,15 @@ export default function Investments() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header com DateRangeSelector - igual ao RevenueManagement */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Investimentos</h1>
@@ -370,6 +374,8 @@ export default function Investments() {
         </div>
         <div className="flex space-x-3">
           <DateRangeSelector 
+            startDate={startDate}
+            endDate={endDate}
             onRangeChange={(start, end) => {
               setStartDate(start);
               setEndDate(end);
@@ -391,7 +397,28 @@ export default function Investments() {
         </div>
       )}
 
-      {/* Resumo */}
+      {/* Period Info - igual ao Dashboard */}
+      {investments.length > 0 ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-blue-600" />
+            <span className="text-sm text-blue-800 font-medium">
+              Investimentos do período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-yellow-600" />
+            <span className="text-sm text-yellow-800 font-medium">
+              Nenhum investimento no período ({new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}). Tente selecionar um período diferente.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Resumo - com cards limpos sem informação do período */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <div className="bg-blue-600 p-4 sm:p-6 rounded-xl text-white shadow-md">
           <div className="flex items-center justify-between">
@@ -420,9 +447,9 @@ export default function Investments() {
         <div className={`${returnPercentage >= 0 ? 'bg-emerald-600' : 'bg-red-600'} p-4 sm:p-6 rounded-xl text-white shadow-md`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/80 text-xs sm:text-sm font-medium">Rentabilidade</p>
+              <p className="text-white/80 text-xs sm:text-sm font-medium pr-2">Rentabilidade</p>
               <p className="text-base sm:text-2xl font-bold mt-1">
-                {returnPercentage >= 0 ? '+' : ''}{returnPercentage.toFixed(1)}%
+                {returnPercentage >= 0 ? '+ ' : ''}{returnPercentage.toFixed(1)}%
               </p>
             </div>
             <div className="bg-white/20 p-2 sm:p-3 rounded-lg">
@@ -448,7 +475,7 @@ export default function Investments() {
             <div>
               <p className="text-white/80 text-xs sm:text-sm font-medium">Ganho Capital</p>
               <p className="text-base sm:text-2xl font-bold mt-1">
-                {totalCapitalGain >= 0 ? '+' : ''}R$ {Math.abs(totalCapitalGain).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                {totalCapitalGain >= 0 ? '+ ' : ''}R$ {Math.abs(totalCapitalGain).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
               </p>
             </div>
             <div className="bg-white/20 p-2 sm:p-3 rounded-lg">
@@ -473,15 +500,25 @@ export default function Investments() {
       {/* Lista de investimentos */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-gray-100">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Sua Carteira</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Sua Carteira</h2>
+            <div className="text-sm text-gray-500">
+              Período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
+            </div>
+          </div>
         </div>
         
         <div className="divide-y divide-gray-100">
           {investments.length === 0 ? (
             <div className="p-8 sm:p-12 text-center">
               <Building className="h-10 sm:h-12 w-10 sm:w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Nenhum investimento cadastrado</h3>
-              <p className="text-sm sm:text-base text-gray-500">Adicione seus investimentos para acompanhar sua carteira.</p>
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Nenhum investimento encontrado</h3>
+              <p className="text-sm sm:text-base text-gray-500">
+                Não há investimentos no período de {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
+              </p>
+              <p className="text-gray-400 text-sm mt-2">
+                Tente selecionar um período diferente ou adicione um novo investimento.
+              </p>
             </div>
           ) : (
             investments.map((investment) => {
@@ -530,7 +567,7 @@ export default function Investments() {
                         <select
                           value={editForm.type || ''}
                           onChange={(e) => setEditForm({ ...editForm, type: e.target.value as any })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                         >
                           {investmentTypes.map(type => (
                             <option key={type.value} value={type.value}>
@@ -541,7 +578,7 @@ export default function Investments() {
                         <select
                           value={editForm.broker || ''}
                           onChange={(e) => setEditForm({ ...editForm, broker: e.target.value })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                         >
                           {brokers.map(broker => (
                             <option key={broker} value={broker}>
@@ -554,7 +591,7 @@ export default function Investments() {
                         type="text"
                         value={editForm.name || ''}
                         onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                        className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                         placeholder="Nome do investimento"
                       />
                       {requiresQuantity(editForm.type || '') ? (
@@ -563,7 +600,7 @@ export default function Investments() {
                             type="number"
                             value={editForm.quantity || ''}
                             onChange={(e) => setEditForm({ ...editForm, quantity: Number(e.target.value) })}
-                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                             placeholder="Quantidade"
                             step="1"
                           />
@@ -571,7 +608,7 @@ export default function Investments() {
                             type="number"
                             value={editForm.current_price || ''}
                             onChange={(e) => setEditForm({ ...editForm, current_price: Number(e.target.value) })}
-                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                             placeholder="Preço atual"
                             step="0.01"
                           />
@@ -579,7 +616,7 @@ export default function Investments() {
                             type="number"
                             value={editForm.purchase_price || ''}
                             onChange={(e) => setEditForm({ ...editForm, purchase_price: Number(e.target.value) })}
-                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                             placeholder="Preço de compra"
                             step="0.01"
                           />
@@ -598,7 +635,7 @@ export default function Investments() {
                             type="number"
                             value={editForm.interest_rate || ''}
                             onChange={(e) => setEditForm({ ...editForm, interest_rate: Number(e.target.value) })}
-                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                            className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                             placeholder="Taxa de juros (% a.a.)"
                             step="0.01"
                           />
@@ -609,23 +646,25 @@ export default function Investments() {
                           type="number"
                           value={editForm.dividend_yield || ''}
                           onChange={(e) => setEditForm({ ...editForm, dividend_yield: Number(e.target.value) })}
-                          className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
                           placeholder="Dividend Yield (% a.a.)"
                           step="0.01"
                         />
                       )}
-                      <div className="flex items-center justify-end space-x-2">
+                      <div className="flex items-center justify-end space-x-3 pt-4">
                         <button
-                          onClick={handleSaveEdit}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors duration-200"
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="py-2 px-4 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors duration-200 text-sm"
                         >
-                          <Save className="h-4 w-4" />
+                          Cancelar
                         </button>
                         <button
-                          onClick={handleCancelEdit}
-                          className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors duration-200"
+                          type="button"
+                          onClick={handleSaveEdit}
+                          className="py-2 px-4 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-200 shadow-sm text-sm"
                         >
-                          <X className="h-4 w-4" />
+                          Salvar
                         </button>
                       </div>
                     </div>
