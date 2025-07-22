@@ -1,7 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, User, AlertTriangle } from 'lucide-react';
 import { ChatMessage } from '../types';
 import OpenAIService from '../lib/openai';
+import { useAuth } from '../contexts/AuthContext';
+import { useDashboardData } from '../hooks/useSupabaseData';
+import { supabase } from '../lib/supabase';
 
 const quickSuggestions = [
   "Como posso economizar mais dinheiro?",
@@ -33,7 +36,10 @@ const MarkdownText = ({ children }: { children: string }) => {
 };
 
 export default function FloatingChatButton() {
+  const { user } = useAuth();
+  const dashboardData = useDashboardData();
   const [isOpen, setIsOpen] = useState(false);
+  const [userFinancialData, setUserFinancialData] = useState<any>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -47,6 +53,164 @@ export default function FloatingChatButton() {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
   const openaiService = useRef<OpenAIService | null>(null);
+
+  // Buscar dados financeiros detalhados do usuário
+  useEffect(() => {
+    if (user && isOpen) {
+      fetchUserFinancialData();
+    }
+  }, [user, isOpen]);
+
+  const fetchUserFinancialData = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Buscar dados detalhados de diferentes tabelas
+      const [
+        incomeResult,
+        expensesResult,
+        investmentsResult,
+        realEstateResult,
+        debtsResult,
+        goalsResult
+      ] = await Promise.all([
+        supabase.from('income_sources').select('*').eq('user_id', user.id).eq('is_active', true),
+        supabase.from('expenses').select('*').eq('user_id', user.id),
+        supabase.from('investments').select('*').eq('user_id', user.id),
+        supabase.from('real_estate').select('*').eq('user_id', user.id),
+        supabase.from('loans').select('*').eq('user_id', user.id),
+        supabase.from('financial_goals').select('*').eq('user_id', user.id)
+      ]);
+
+      // Processar dados para contexto da IA
+      const income = (incomeResult.data || []).reduce((sum, item) => {
+        let monthlyAmount = item.amount;
+        switch (item.frequency) {
+          case 'weekly': monthlyAmount = item.amount * 4.33; break;
+          case 'yearly': monthlyAmount = item.amount / 12; break;
+          case 'one-time': monthlyAmount = item.amount; break;
+        }
+        return sum + monthlyAmount;
+      }, 0);
+
+      const expenses = (expensesResult.data || []).reduce((sum, item) => {
+        let monthlyAmount = item.amount;
+        switch (item.frequency) {
+          case 'weekly': monthlyAmount = item.amount * 4.33; break;
+          case 'yearly': monthlyAmount = item.amount / 12; break;
+          case 'one-time': monthlyAmount = item.amount; break;
+        }
+        return sum + monthlyAmount;
+      }, 0);
+
+      const investmentValue = (investmentsResult.data || []).reduce((sum, item) => {
+        if (item.quantity && item.current_price) {
+          return sum + (item.quantity * item.current_price);
+        }
+        return sum + (item.current_value || item.amount || 0);
+      }, 0);
+
+      const realEstateValue = (realEstateResult.data || []).reduce((sum, item) => {
+        return sum + (item.current_value || item.purchase_price || 0);
+      }, 0);
+
+      const totalDebt = (debtsResult.data || []).reduce((sum, item) => {
+        return sum + (item.remaining_amount || item.amount || 0);
+      }, 0);
+
+      // Categorias principais
+      const incomeCategories = [...new Set((incomeResult.data || []).map(item => item.category))];
+      const expenseCategories = [...new Set((expensesResult.data || []).map(item => item.category))];
+      const investmentTypes = [...new Set((investmentsResult.data || []).map(item => item.type))];
+      const goals = (goalsResult.data || []).map(item => item.name);
+
+      const financialData = {
+        income: Math.round(income),
+        expenses: Math.round(expenses),
+        netIncome: Math.round(income - expenses),
+        investmentValue: Math.round(investmentValue),
+        realEstateValue: Math.round(realEstateValue),
+        totalDebt: Math.round(totalDebt),
+        netWorth: Math.round(investmentValue + realEstateValue - totalDebt),
+        incomeCategories,
+        expenseCategories,
+        investmentTypes,
+        goals,
+        // Análise de perfil
+        savingsRate: income > 0 ? ((income - expenses) / income * 100) : 0,
+        debtToIncomeRatio: income > 0 ? (totalDebt / (income * 12) * 100) : 0,
+        investmentToIncomeRatio: income > 0 ? (investmentValue / (income * 12) * 100) : 0
+      };
+
+      setUserFinancialData(financialData);
+
+      // Manter mensagem inicial simples sempre
+      // A análise contextual será feita apenas nas respostas subsequentes
+
+    } catch (error) {
+      console.error('Erro ao buscar dados financeiros:', error);
+    }
+  };
+
+  const generateContextualGreeting = (data: any) => {
+    let greeting = '👋 **Olá! Analisei seu perfil financeiro.**\n\n';
+    
+    // Resumo rápido
+    greeting += `📊 **Seu panorama:**\n`;
+    greeting += `• Renda mensal: R$ ${data.income.toLocaleString('pt-BR')}\n`;
+    greeting += `• Gastos mensais: R$ ${data.expenses.toLocaleString('pt-BR')}\n`;
+    greeting += `• Saldo mensal: R$ ${data.netIncome.toLocaleString('pt-BR')}\n`;
+    if (data.investmentValue > 0) {
+      greeting += `• Investimentos: R$ ${data.investmentValue.toLocaleString('pt-BR')}\n`;
+    }
+    if (data.totalDebt > 0) {
+      greeting += `• Dívidas: R$ ${data.totalDebt.toLocaleString('pt-BR')}\n`;
+    }
+    greeting += '\n';
+
+    // Análise personalizada
+    if (data.savingsRate < 10) {
+      greeting += '⚠️ **Atenção**: Taxa de poupança baixa. Vamos melhorar isso!\n\n';
+    } else if (data.savingsRate > 20) {
+      greeting += '🎉 **Parabéns**: Excelente taxa de poupança!\n\n';
+    }
+
+    if (data.debtToIncomeRatio > 30) {
+      greeting += '🔴 **Prioridade**: Reduzir dívidas (alto endividamento).\n\n';
+    }
+
+    greeting += '💡 **Como posso ajudar você hoje?**';
+
+    return greeting;
+  };
+
+  const generatePersonalizedSuggestions = (data: any) => {
+    const suggestions = [];
+
+    if (data.savingsRate < 10) {
+      suggestions.push("Como aumentar minha taxa de poupança?");
+    }
+    
+    if (data.totalDebt > 0) {
+      suggestions.push("Estratégia para quitar minhas dívidas");
+    }
+    
+    if (data.investmentValue === 0) {
+      suggestions.push("Como começar a investir com minha renda?");
+    } else {
+      suggestions.push("Como diversificar meus investimentos?");
+    }
+
+    if (data.goals.length === 0) {
+      suggestions.push("Ajude-me a definir metas financeiras");
+    }
+
+    if (data.netIncome > 0) {
+      suggestions.push("Como otimizar meu orçamento?");
+    }
+
+    return suggestions.slice(0, 3);
+  };
 
   // Inicializar OpenAI Service
   const initOpenAI = () => {
@@ -85,8 +249,8 @@ export default function FloatingChatButton() {
       let response;
       
       if (openaiService.current) {
-        // Tentar usar OpenAI
-        response = await openaiService.current.generateFinancialAdvice(content);
+        // Passar dados financeiros para a IA
+        response = await openaiService.current.generateFinancialAdvice(content, userFinancialData);
       } else {
         throw new Error('OpenAI service não disponível');
       }
@@ -110,53 +274,122 @@ export default function FloatingChatButton() {
       console.error('Erro no chat:', error);
       setError('Erro na IA - usando modo local');
       
-      // Fallback com respostas locais melhoradas
-      const fallbackResponses = [
-        `💰 **Sobre economia doméstica:**
-
-Para economizar no Brasil, recomendo:
-• Usar a regra 50/30/20 no orçamento
-• Revisar assinaturas desnecessárias
-• Negociar contas mensais (energia, internet)
-• Comparar preços antes de comprar
-
-🎯 **Dica**: Anote todos os gastos por 30 dias!`,
-
-        `📈 **Sobre investimentos:**
-
-Para começar a investir:
-• Quite dívidas caras primeiro
-• Forme reserva de emergência
-• Comece com Tesouro Direto ou CDB
-• Diversifique gradualmente
-
-🚀 **Dica**: R$ 100/mês já faz diferença!`,
-
-        `🏦 **Sobre dívidas:**
-
-Para organizar dívidas:
-• Liste todas com juros e valores
-• Quite as de maior taxa primeiro
-• Negocie no Serasa (descontos até 90%)
-• Evite o rotativo do cartão
-
-💡 **Dica**: Sempre há desconto na negociação!`
-      ];
-
-      const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      // Fallback com respostas personalizadas
+      const fallbackResponse = generatePersonalizedFallback(content, userFinancialData);
 
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: randomResponse,
+        content: fallbackResponse,
         timestamp: new Date().toISOString(),
-        suggestions: quickSuggestions.slice(Math.floor(Math.random() * 2), Math.floor(Math.random() * 2) + 3)
+        suggestions: userFinancialData ? generatePersonalizedSuggestions(userFinancialData) : quickSuggestions.slice(0, 3)
       };
       
       setMessages(prev => [...prev, aiResponse]);
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const generatePersonalizedFallback = (message: string, userData: any) => {
+    if (!userData) {
+      return `💰 **Resposta padrão sobre finanças:**
+
+Para te ajudar melhor, preciso conhecer seu perfil financeiro. 
+Que tal compartilhar sua situação atual?
+
+🎯 **Posso ajudar com:**
+• Planejamento orçamentário
+• Estratégias de investimento
+• Quitação de dívidas
+• Metas financeiras`;
+    }
+
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('economizar') || lowerMessage.includes('poupan')) {
+      return `💰 **Estratégias personalizadas para você:**
+
+Com sua renda de R$ ${userData.income.toLocaleString('pt-BR')} e gastos de R$ ${userData.expenses.toLocaleString('pt-BR')}:
+
+• **Meta**: Aumentar sua taxa de poupança atual de ${userData.savingsRate.toFixed(1)}%
+• **Corte gastos**: Revise categorias de maior impacto
+• **Aumente renda**: ${userData.incomeCategories.length} fontes ativas, considere diversificar
+• **Automatize**: Configure transferência automática para poupança
+
+🎯 **Sugestão**: Tente poupar pelo menos 20% da renda mensal.`;
+    }
+    
+    if (lowerMessage.includes('investir') || lowerMessage.includes('investimento')) {
+      const hasInvestments = userData.investmentValue > 0;
+      
+      if (hasInvestments) {
+        return `📈 **Análise dos seus investimentos:**
+
+Você já tem R$ ${userData.investmentValue.toLocaleString('pt-BR')} investidos.
+Tipos atuais: ${userData.investmentTypes.join(', ')}
+
+• **Diversificação**: Considere balancear renda fixa/variável
+• **Aportes**: Com sobra de R$ ${userData.netIncome.toLocaleString('pt-BR')}/mês, pode aumentar
+• **Revisão**: Analise performance dos investimentos atuais
+• **Objetivos**: Alinhe investimentos com suas metas
+
+🚀 **Dica**: Mantenha disciplina nos aportes mensais.`;
+      } else {
+        return `📈 **Primeiro passo nos investimentos:**
+
+Com renda de R$ ${userData.income.toLocaleString('pt-BR')} e sobra de R$ ${userData.netIncome.toLocaleString('pt-BR')}:
+
+• **Reserva primeiro**: 6 meses de gastos (R$ ${(userData.expenses * 6).toLocaleString('pt-BR')})
+• **Comece pequeno**: R$ 100-500/mês já faz diferença
+• **Renda fixa**: CDB, Tesouro Direto para começar
+• **Educação**: Estude antes de partir para ações
+
+💡 **Sugestão**: Comece com 10% da sobra mensal.`;
+      }
+    }
+    
+    if (lowerMessage.includes('dívida') || lowerMessage.includes('débito')) {
+      if (userData.totalDebt > 0) {
+        return `🏦 **Estratégia para suas dívidas:**
+
+Dívida total: R$ ${userData.totalDebt.toLocaleString('pt-BR')}
+Relação dívida/renda: ${userData.debtToIncomeRatio.toFixed(1)}%
+
+${userData.debtToIncomeRatio > 30 ? '🔴 **Situação crítica** - priorize quitação!' : '🟡 **Controlável** - planeje quitação.'}
+
+• **Sobra mensal**: R$ ${userData.netIncome.toLocaleString('pt-BR')} disponível
+• **Priorize**: Dívidas com maiores juros primeiro
+• **Negocie**: Sempre há desconto na renegociação
+• **Orçamento**: Corte gastos temporariamente
+
+⚡ **Meta**: Quitar em ${Math.ceil(userData.totalDebt / Math.max(userData.netIncome, 1))} meses.`;
+      } else {
+        return `🎉 **Parabéns! Você está livre de dívidas.**
+
+Isso é excelente para sua saúde financeira!
+
+• **Mantenha**: Evite endividamento desnecessário
+• **Foque**: Agora priorize investimentos e reserva
+• **Prevenção**: Use cartão com responsabilidade
+• **Oportunidade**: Aproveite para acelerar metas
+
+💡 **Dica**: Use essa vantagem para investir mais agressivamente.`;
+      }
+    }
+
+    // Resposta padrão personalizada
+    return `🎯 **Análise personalizada:**
+
+Baseado no seu perfil:
+• Renda: R$ ${userData.income.toLocaleString('pt-BR')}/mês
+• Sobra: R$ ${userData.netIncome.toLocaleString('pt-BR')}/mês  
+• Taxa poupança: ${userData.savingsRate.toFixed(1)}%
+
+**Próximos passos recomendados:**
+${userData.totalDebt > 0 ? '1. Reduzir dívidas\n' : ''}${userData.investmentValue === 0 ? '2. Começar a investir\n' : '2. Diversificar investimentos\n'}3. Otimizar orçamento
+
+💡 Posso detalhar qualquer uma dessas áreas!`;
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -188,7 +421,7 @@ Para organizar dívidas:
                 <div>
                   <h3 className="font-semibold text-sm">Assistente IA</h3>
                   <p className="text-xs text-white/80">
-                    {isTyping ? 'Digitando...' : 'Online agora'}
+                    {isTyping ? 'Analisando...' : userFinancialData ? 'Com seus dados' : 'Carregando perfil...'}
                   </p>
                 </div>
               </div>
@@ -273,14 +506,14 @@ Para organizar dívidas:
                   <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-600 flex items-center justify-center">
                     <Bot className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white" />
                   </div>
-                                      <div className="bg-gray-50 rounded-2xl p-2 sm:p-3 border border-gray-200">
+                  <div className="bg-gray-50 rounded-2xl p-2 sm:p-3 border border-gray-200">
                     <div className="flex items-center space-x-1">
                       <div className="flex space-x-0.5 sm:space-x-1">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
-                      <span className="text-[10px] text-gray-500 ml-1">IA pensando...</span>
+                      <span className="text-[10px] text-gray-500 ml-1">IA analisando...</span>
                     </div>
                   </div>
                 </div>
