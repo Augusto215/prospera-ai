@@ -231,7 +231,7 @@ export default function Dashboard() {
               <p className="text-white/80 text-sm font-medium">Receita Mensal</p>
               <p className="text-xl sm:text-3xl font-bold mt-1">{formatCurrency(dashboardData.totalMonthlyIncome || 0)}</p>
               {dateFilterApplied && (
-                <p className="text-white/60 text-xs mt-1">Período filtrado</p>
+                <p className="text-white/60 text-xs mt-1">Período filtrado (inclui transações únicas)</p>
               )}
             </div>
             <div className="bg-white/20 p-3 rounded-lg cursor-pointer" onClick={() => navigate('/revenues')}>
@@ -246,7 +246,7 @@ export default function Dashboard() {
               <p className="text-white/80 text-sm font-medium">Despesa Mensal</p>
               <p className="text-xl sm:text-3xl font-bold mt-1">{formatCurrency(dashboardData.totalMonthlyExpenses || 0)}</p>
               {dateFilterApplied && (
-                <p className="text-white/60 text-xs mt-1">Período filtrado</p>
+                <p className="text-white/60 text-xs mt-1">Período filtrado (inclui transações únicas)</p>
               )}
             </div>
             <div className="bg-white/20 p-3 rounded-lg cursor-pointer" onClick={() => navigate('/expenses')}>
@@ -352,7 +352,11 @@ export default function Dashboard() {
             }
           </span>
         </div>
-        <WealthEvolutionChart />
+        <WealthEvolutionChart 
+          startDate={startDate}
+          endDate={endDate}
+          dateFilterApplied={dateFilterApplied}
+        />
       </div>
 
       {/* Asset Breakdown */}
