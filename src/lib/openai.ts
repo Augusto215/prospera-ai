@@ -100,13 +100,28 @@ Limite: Resposta completa em até 400 palavras`;
   }
 
   private buildSystemPrompt(userContext: any) {
-    const contextInfo = userContext.income ? `
-CONTEXTO FINANCEIRO DO USUÁRIO:
-- Renda mensal: R$ ${userContext.income}
-- Gastos principais: ${userContext.expenses ? userContext.expenses.join(', ') : 'Não informado'}
-- Investimentos atuais: ${userContext.investments ? userContext.investments.join(', ') : 'Não informado'}
-- Objetivos: ${userContext.goals ? userContext.goals.join(', ') : 'Não informado'}
-` : '';
+    // Monta contexto detalhado com todos os dados do dashboard
+    let contextInfo = '';
+    if (userContext) {
+      contextInfo += '\nCONTEXTO FINANCEIRO DO USUÁRIO:\n';
+      if (userContext.totalMonthlyIncome) contextInfo += `- Renda mensal total: R$ ${userContext.totalMonthlyIncome}\n`;
+      if (userContext.totalMonthlyExpenses) contextInfo += `- Gastos mensais totais: R$ ${userContext.totalMonthlyExpenses}\n`;
+      if (userContext.netMonthlyIncome) contextInfo += `- Sobra mensal: R$ ${userContext.netMonthlyIncome}\n`;
+      if (userContext.totalInvestmentValue) contextInfo += `- Investimentos: R$ ${userContext.totalInvestmentValue} (${userContext.investmentTypes?.join(', ')})\n`;
+      if (userContext.totalRealEstateValue) contextInfo += `- Imóveis: R$ ${userContext.totalRealEstateValue} (${userContext.propertyCount} propriedades)\n`;
+      if (userContext.totalDebt) contextInfo += `- Dívidas: R$ ${userContext.totalDebt}\n`;
+      if (userContext.totalBills) contextInfo += `- Contas fixas: R$ ${userContext.totalBills}\n`;
+      if (userContext.totalRetirementSaved) contextInfo += `- Previdência: R$ ${userContext.totalRetirementSaved}\n`;
+      if (userContext.totalVehicleValue) contextInfo += `- Veículos: R$ ${userContext.totalVehicleValue}\n`;
+      if (userContext.totalExoticValue) contextInfo += `- Ativos exóticos: R$ ${userContext.totalExoticValue}\n`;
+      if (userContext.netWorth) contextInfo += `- Patrimônio líquido: R$ ${userContext.netWorth}\n`;
+      if (userContext.emergencyFundMonths) contextInfo += `- Reserva de emergência: ${userContext.emergencyFundMonths} meses\n`;
+      if (userContext.goalCount) contextInfo += `- Metas financeiras: ${userContext.goalCount} ativa(s), poupado R$ ${userContext.totalGoalsSaved}\n`;
+      if (userContext.goals) contextInfo += `- Detalhes das metas: ${JSON.stringify(userContext.goals)}\n`;
+      if (userContext.expenseCategories) contextInfo += `- Categorias de gastos: ${userContext.expenseCategories.join(', ')}\n`;
+      if (userContext.incomeCategories) contextInfo += `- Categorias de renda: ${userContext.incomeCategories.join(', ')}\n`;
+      if (userContext.recentTransactions) contextInfo += `- Transações recentes: ${JSON.stringify(userContext.recentTransactions)}\n`;
+    }
 
     return `
 Você é uma assistente financeira especializada em finanças pessoais brasileiras.

@@ -413,7 +413,7 @@ export default function FloatingChatButton() {
     }
   };
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, suggestion: string) => {
     if (!content.trim()) return;
 
     // Inicializar OpenAI se necessário
@@ -424,7 +424,7 @@ export default function FloatingChatButton() {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content,
+      content: suggestion || content,
       timestamp: new Date().toISOString()
     };
 
@@ -580,8 +580,39 @@ ${userData.totalDebt > 0 ? '1. Reduzir dívidas\n' : ''}${userData.investmentVal
 💡 Posso detalhar qualquer uma dessas áreas!`;
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    handleSendMessage(suggestion);
+  // Sugestões rápidas personalizadas
+  const handleSuggestionClick = async (suggestion: string) => {
+    let prompt = suggestion;
+    if (userFinancialData) {
+      if (suggestion === "Analisar minhas metas financeiras") {
+        prompt = `Analise detalhadamente minhas metas financeiras considerando meus dados atuais: \n\n• Metas: ${userFinancialData.goalCount} ativa(s), poupado R$ ${userFinancialData.totalGoalsSaved?.toLocaleString('pt-BR')}\n• Sobra mensal: R$ ${userFinancialData.netMonthlyIncome?.toLocaleString('pt-BR')}\n• Reserva de emergência: ${userFinancialData.emergencyFundMonths} meses\n• Patrimônio líquido: R$ ${userFinancialData.netWorth?.toLocaleString('pt-BR')}\n• Metas: ${JSON.stringify(userFinancialData.goals)}\nFaça recomendações específicas para acelerar ou melhorar minhas metas.`;
+      }
+      else if (suggestion === "Analisar meus gastos") {
+        prompt = `Analise meus gastos mensais considerando:\n\n• Gastos totais: R$ ${userFinancialData.totalMonthlyExpenses?.toLocaleString('pt-BR')}\n• Categorias principais: ${userFinancialData.expenseCategories?.join(', ')}\n• Contas fixas: R$ ${userFinancialData.totalBills?.toLocaleString('pt-BR')}\n• Veículos: R$ ${userFinancialData.totalVehicleExpenses?.toLocaleString('pt-BR')}\n• Dívidas: R$ ${userFinancialData.totalDebt?.toLocaleString('pt-BR')}\n• Gastos detalhados: ${JSON.stringify(userFinancialData.expenses)}\nDê sugestões práticas para otimizar meu orçamento e reduzir gastos.`;
+      }
+      else if (suggestion === "Traçar planos com a IA") {
+        prompt = `Com base em todos os meus dados financeiros atuais:\n\n• Renda mensal: R$ ${userFinancialData.totalMonthlyIncome?.toLocaleString('pt-BR')}\n• Gastos mensais: R$ ${userFinancialData.totalMonthlyExpenses?.toLocaleString('pt-BR')}\n• Investimentos: R$ ${userFinancialData.totalInvestmentValue?.toLocaleString('pt-BR')} (${userFinancialData.investmentTypes?.join(', ')})\n• Imóveis: R$ ${userFinancialData.totalRealEstateValue?.toLocaleString('pt-BR')}\n• Dívidas: R$ ${userFinancialData.totalDebt?.toLocaleString('pt-BR')}\n• Metas: ${userFinancialData.goalCount} ativa(s)\n• Patrimônio líquido: R$ ${userFinancialData.netWorth?.toLocaleString('pt-BR')}\n• Reserva de emergência: ${userFinancialData.emergencyFundMonths} meses\n• Previdência: R$ ${userFinancialData.totalRetirementSaved?.toLocaleString('pt-BR')}\n• Veículos: R$ ${userFinancialData.totalVehicleValue?.toLocaleString('pt-BR')}\n• Ativos exóticos: R$ ${userFinancialData.totalExoticValue?.toLocaleString('pt-BR')}\n• Recentes transações: ${JSON.stringify(userFinancialData.recentTransactions)}\nMe ajude a traçar um plano financeiro personalizado para os próximos 12 meses, incluindo metas, investimentos e estratégias de economia.`;
+      }
+      else {
+        // Inclui todos os dados do usuário no prompt, independente da sugestão
+        prompt = `Sugestão: ${suggestion}\n\nAqui estão TODOS os meus dados financeiros atuais para análise personalizada:\n\n${JSON.stringify(userFinancialData, null, 2)}\n\nUtilize todos esses dados para responder de forma personalizada à sugestão acima.`;
+      }
+    }
+    // // Adiciona apenas a sugestão como mensagem do usuário
+    // setMessages(prev => [
+    //   ...prev,
+    //   {
+    //     id: Date.now().toString(),
+    //     type: 'user',
+    //     content: suggestion,
+    //     timestamp: new Date().toISOString()
+    //   }
+    // ]);
+    // setInputValue('');
+    // setIsTyping(true);
+    // setError('');
+    // Chama a IA com o prompt personalizado, sem adicionar o prompt como mensagem do usuário
+    await handleSendMessage(prompt, suggestion);
   };
 
   return (
