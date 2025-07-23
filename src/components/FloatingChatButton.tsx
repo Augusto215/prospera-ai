@@ -410,7 +410,7 @@ ${userData.totalDebt > 0 ? '1. Reduzir dívidas\n' : ''}${userData.investmentVal
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-80 md:w-96 h-[70vh] sm:h-[500px] bg-white rounded-t-xl sm:rounded-xl shadow-xl border border-gray-200 z-50 flex flex-col overflow-hidden">
+        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-[28rem] md:w-[36rem] h-[90vh] sm:h-[650px] bg-white rounded-t-xl sm:rounded-xl shadow-xl border border-gray-200 z-50 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="p-4 bg-blue-600 text-white">
             <div className="flex items-center justify-between">
