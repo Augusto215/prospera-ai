@@ -32,10 +32,6 @@ const investmentTypes = [
   { value: 'titulos-credito', label: 'Títulos de Crédito', color: 'bg-indigo-500' }
 ];
 
-const brokers = [
-  'XP Investimentos', 'Rico', 'Inter', 'BTG Pactual', 'Nubank', 'Clear', 'Toro', 'Easynvest'
-];
-
 export default function Investments() {
   const { user } = useAuth();
   const [investments, setInvestments] = useState<Investment[]>([]);
@@ -579,17 +575,13 @@ const handleSaveEdit = async () => {
                             </option>
                           ))}
                         </select>
-                        <select
+                        <input
+                          type="text"
                           value={editForm.broker || ''}
                           onChange={(e) => setEditForm({ ...editForm, broker: e.target.value })}
                           className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 bg-white text-black"
-                        >
-                          {brokers.map(broker => (
-                            <option key={broker} value={broker}>
-                              {broker}
-                            </option>
-                          ))}
-                        </select>
+                          placeholder="Banco/Corretora"
+                        />
                       </div>
                       <input
                         type="text"
@@ -853,18 +845,13 @@ const handleSaveEdit = async () => {
                           className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm sm:text-base bg-white text-black"
                         />
 
-                        <select
+                        <input
+                          type="text"
                           name="broker"
+                          placeholder="Banco/Corretora (ex: XP Investimentos, Rico)"
                           required
                           className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm sm:text-base bg-white text-black"
-                        >
-                          <option value="">Corretora</option>
-                          {brokers.map(broker => (
-                            <option key={broker} value={broker}>
-                              {broker}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
 
                       {requiresQuantity(selectedType) ? (
