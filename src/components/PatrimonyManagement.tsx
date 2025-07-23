@@ -462,7 +462,7 @@ export default function PatrimonyManagement() {
                   <Home className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum imóvel cadastrado</h3>
                   <p className="text-gray-500 mb-4">Adicione seus imóveis para acompanhar seu patrimônio.</p>
-                  <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('prospera-set-tab', { detail: 'real-estate' }))} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar Imóvel
                   </button>
@@ -524,7 +524,7 @@ export default function PatrimonyManagement() {
                   <Building className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum investimento cadastrado</h3>
                   <p className="text-gray-500 mb-4">Adicione seus investimentos para acompanhar seu patrimônio.</p>
-                  <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('prospera-set-tab', { detail: 'investments' }))} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar Investimento
                   </button>
@@ -586,7 +586,7 @@ export default function PatrimonyManagement() {
                   <Car className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum veículo cadastrado</h3>
                   <p className="text-gray-500 mb-4">Adicione seus veículos para acompanhar seu patrimônio.</p>
-                  <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('prospera-set-tab', { detail: 'vehicles' }))} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar Veículo
                   </button>
@@ -646,7 +646,7 @@ export default function PatrimonyManagement() {
                   <Gem className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum ativo exótico cadastrado</h3>
                   <p className="text-gray-500 mb-4">Adicione seus ativos exóticos para acompanhar seu patrimônio.</p>
-                  <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
+                  <button onClick={() => window.dispatchEvent(new CustomEvent('prospera-set-tab', { detail: 'exotic-assets' }))} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center">
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar Ativo Exótico
                   </button>

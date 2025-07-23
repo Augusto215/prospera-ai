@@ -105,13 +105,28 @@ export default function SmartAlerts() {
       const { data, error } = await query;
       if (error) throw error;
       
+      // Filtrar alertas de contas pagas
+      let filteredAlerts = data || [];
+      // Busca contas pagas
+      const { data: paidBills } = await supabase
+        .from('bills')
+        .select('id, is_paid')
+        .eq('user_id', user.id)
+        .eq('is_paid', true);
+      const paidBillIds = paidBills ? paidBills.map((bill: any) => bill.id) : [];
+      filteredAlerts = filteredAlerts.filter(alert => {
+        // Se for alerta de conta e a conta está paga, remove
+        if (alert.type === 'bill' && alert.related_id && paidBillIds.includes(alert.related_id)) {
+          return false;
+        }
+        return true;
+      });
       // Corrigir formatação de moeda nos alertas
-      const alertsWithFixedCurrency = (data || []).map(alert => ({
+      const alertsWithFixedCurrency = filteredAlerts.map(alert => ({
         ...alert,
         title: fixCurrencyFormat(alert.title),
         description: fixCurrencyFormat(alert.description)
       }));
-      
       setAlerts(alertsWithFixedCurrency);
     } catch (error) {
       console.error('Error fetching alerts:', error);

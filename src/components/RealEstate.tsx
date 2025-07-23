@@ -397,7 +397,7 @@ const RealEstate: React.FC = () => {
                     name="type"
                     value={formData.type}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                     required
                   >
                     {propertyTypes.map(type => (
@@ -417,7 +417,7 @@ const RealEstate: React.FC = () => {
                     name="address"
                     value={formData.address}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                     required
                   />
                 </div>
@@ -431,7 +431,7 @@ const RealEstate: React.FC = () => {
                     name="purchase_price"
                     value={formData.purchase_price}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                     required
                   />
                 </div>
@@ -445,7 +445,7 @@ const RealEstate: React.FC = () => {
                     name="current_value"
                     value={formData.current_value}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                   />
                 </div>
 
@@ -458,7 +458,7 @@ const RealEstate: React.FC = () => {
                     name="monthly_rent"
                     value={formData.monthly_rent}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                   />
                 </div>
 
@@ -471,7 +471,7 @@ const RealEstate: React.FC = () => {
                     name="expenses"
                     value={formData.expenses}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                   />
                 </div>
 
@@ -484,7 +484,7 @@ const RealEstate: React.FC = () => {
                     name="purchase_date"
                     value={formData.purchase_date}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                     required
                   />
                 </div>
@@ -498,7 +498,7 @@ const RealEstate: React.FC = () => {
                     name="tax_rate"
                     value={formData.tax_rate}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base bg-white text-black"
                     min="0"
                     max="100"
                     step="0.01"

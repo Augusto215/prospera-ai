@@ -340,13 +340,13 @@ export default function ExoticAssets() {
                           type="text"
                           value={editForm.name || ''}
                           onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                           placeholder="Nome do item"
                         />
                         <select
                           value={editForm.category || ''}
                           onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                         >
                           {assetCategories.map(category => (
                             <option key={category.value} value={category.value}>
@@ -360,7 +360,7 @@ export default function ExoticAssets() {
                           type="number"
                           value={editForm.purchase_price || ''}
                           onChange={(e) => setEditForm({ ...editForm, purchase_price: Number(e.target.value) })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                           placeholder="Preço de compra"
                           step="0.01"
                         />
@@ -368,14 +368,14 @@ export default function ExoticAssets() {
                           type="number"
                           value={editForm.current_value || ''}
                           onChange={(e) => setEditForm({ ...editForm, current_value: Number(e.target.value) || null })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                           placeholder="Valor atual"
                           step="0.01"
                         />
                         <select
                           value={editForm.condition || ''}
                           onChange={(e) => setEditForm({ ...editForm, condition: e.target.value as any })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                         >
                           {conditionOptions.map(condition => (
                             <option key={condition.value} value={condition.value}>
@@ -521,13 +521,13 @@ export default function ExoticAssets() {
                   name="name"
                   placeholder="Nome do item"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 />
                 
                 <select
                   name="category"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 >
                   <option value="">Categoria</option>
                   {assetCategories.map(category => (
@@ -545,7 +545,7 @@ export default function ExoticAssets() {
                   placeholder="Preço de compra (R$)"
                   step="0.01"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 />
                 
                 <input
@@ -553,13 +553,13 @@ export default function ExoticAssets() {
                   name="current_value"
                   placeholder="Valor atual (R$) - opcional"
                   step="0.01"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 />
                 
                 <select
                   name="condition"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 >
                   <option value="">Condição</option>
                   {conditionOptions.map(condition => (
@@ -575,7 +575,7 @@ export default function ExoticAssets() {
                   type="text"
                   name="location"
                   placeholder="Localização (onde está guardado)"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 />
                 
                 <input
@@ -583,7 +583,7 @@ export default function ExoticAssets() {
                   name="insurance_value"
                   placeholder="Valor do seguro (R$) - opcional"
                   step="0.01"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 />
               </div>
               
@@ -593,7 +593,7 @@ export default function ExoticAssets() {
                   type="date"
                   name="purchase_date"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                 />
               </div>
               
@@ -601,7 +601,7 @@ export default function ExoticAssets() {
                 name="description"
                 placeholder="Descrição detalhada (opcional)"
                 rows={3}
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
               />
               
               {/* Sistema de tags */}
@@ -614,7 +614,7 @@ export default function ExoticAssets() {
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                     placeholder="Adicionar tag..."
-                    className="flex-1 p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    className="flex-1 p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white text-black"
                   />
                   <button
                     type="button"

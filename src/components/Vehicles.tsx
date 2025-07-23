@@ -30,7 +30,7 @@ const vehicleTypes = [
 
 const carBrands = [
   'Toyota', 'Honda', 'Ford', 'Chevrolet', 'Volkswagen', 'BMW', 'Mercedes-Benz', 'Audi',
-  'Hyundai', 'Kia', 'Nissan', 'Fiat', 'Renault', 'Peugeot', 'Citroën', 'Jeep', 'Mitsubishi'
+  'Hyundai', 'Kia', 'Nissan', 'Fiat', 'Renault', 'Peugeot', 'Citroën', 'Jeep', 'Mitsubishi', 'Outra'
 ];
 
 export default function Vehicles() {
@@ -478,7 +478,7 @@ export default function Vehicles() {
                 <select
                   name="type"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 >
                   <option value="">Tipo de Veículo</option>
                   {vehicleTypes.map(type => (
@@ -491,7 +491,7 @@ export default function Vehicles() {
                 <select
                   name="brand"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 >
                   <option value="">Marca</option>
                   {carBrands.map(brand => (
@@ -508,7 +508,7 @@ export default function Vehicles() {
                   name="model"
                   placeholder="Modelo (ex: Civic, Gol)"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 />
                 
                 <input
@@ -518,7 +518,7 @@ export default function Vehicles() {
                   required
                   min="1900"
                   max={new Date().getFullYear() + 1}
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 />
               </div>
               
@@ -529,7 +529,7 @@ export default function Vehicles() {
                   placeholder="Preço de compra (R$)"
                   step="0.01"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 />
                 
                 <input
@@ -537,7 +537,7 @@ export default function Vehicles() {
                   name="current_value"
                   placeholder="Valor atual (R$) - opcional"
                   step="0.01"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 />
               </div>
               
@@ -547,7 +547,7 @@ export default function Vehicles() {
                   name="mileage"
                   placeholder="Quilometragem"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 />
                 
                 <input
@@ -555,9 +555,8 @@ export default function Vehicles() {
                   name="depreciation_rate"
                   placeholder="Taxa de depreciação (% a.a.)"
                   step="0.1"
-                  defaultValue="10.0"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 />
               </div>
               
@@ -567,9 +566,8 @@ export default function Vehicles() {
                   name="monthly_expenses"
                   placeholder="Gastos mensais (R$)"
                   step="0.01"
-                  defaultValue="0"
                   required
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                 />
                 
                 <div>
@@ -578,7 +576,7 @@ export default function Vehicles() {
                     type="date"
                     name="purchase_date"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-black"
                   />
                 </div>
               </div>
