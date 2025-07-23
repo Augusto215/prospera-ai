@@ -7,6 +7,9 @@ import { useDashboardData } from '../hooks/useSupabaseData';
 import { supabase } from '../lib/supabase';
 
 const quickSuggestions = [
+  "Analisar minhas metas financeiras",
+  "Analisar meus gastos",
+  "Traçar planos com a IA",
   "Como posso economizar mais dinheiro?",
   "Qual o melhor investimento para mim?",
   "Como organizar minha previdência?",
@@ -55,100 +58,285 @@ export default function FloatingChatButton() {
   const openaiService = useRef<OpenAIService | null>(null);
 
   // Buscar dados financeiros detalhados do usuário
+  // Buscar dados financeiros detalhados do usuário
   useEffect(() => {
     if (user && isOpen) {
-      fetchUserFinancialData();
+      fetchComprehensiveUserData();
     }
   }, [user, isOpen]);
 
-  const fetchUserFinancialData = async () => {
+  const fetchComprehensiveUserData = async () => {
     if (!user?.id) return;
 
     try {
-      // Buscar dados detalhados de diferentes tabelas
+      // Buscar TODOS os dados financeiros disponíveis do usuário
       const [
         incomeResult,
         expensesResult,
         investmentsResult,
         realEstateResult,
+        vehiclesResult,
+        exoticAssetsResult,
         debtsResult,
-        goalsResult
+        goalsResult,
+        billsResult,
+        retirementResult,
+        bankAccountsResult,
+        transactionsResult
       ] = await Promise.all([
         supabase.from('income_sources').select('*').eq('user_id', user.id).eq('is_active', true),
         supabase.from('expenses').select('*').eq('user_id', user.id),
         supabase.from('investments').select('*').eq('user_id', user.id),
         supabase.from('real_estate').select('*').eq('user_id', user.id),
+        supabase.from('vehicles').select('*').eq('user_id', user.id),
+        supabase.from('exotic_assets').select('*').eq('user_id', user.id),
         supabase.from('loans').select('*').eq('user_id', user.id),
-        supabase.from('financial_goals').select('*').eq('user_id', user.id)
+        supabase.from('financial_goals').select('*').eq('user_id', user.id),
+        supabase.from('bills').select('*').eq('user_id', user.id),
+        supabase.from('retirement_plans').select('*').eq('user_id', user.id),
+        supabase.from('bank_accounts').select('*').eq('user_id', user.id),
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(20)
       ]);
 
-      // Processar dados para contexto da IA
-      const income = (incomeResult.data || []).reduce((sum, item) => {
+      // Calcular receitas mensais detalhadas
+      const incomeData = (incomeResult.data || []).map(item => {
         let monthlyAmount = item.amount;
         switch (item.frequency) {
           case 'weekly': monthlyAmount = item.amount * 4.33; break;
           case 'yearly': monthlyAmount = item.amount / 12; break;
           case 'one-time': monthlyAmount = item.amount; break;
         }
-        return sum + monthlyAmount;
-      }, 0);
+        return { ...item, monthlyAmount };
+      });
+      const totalIncome = incomeData.reduce((sum, item) => sum + item.monthlyAmount, 0);
 
-      const expenses = (expensesResult.data || []).reduce((sum, item) => {
+      // Calcular despesas mensais detalhadas
+      const expenseData = (expensesResult.data || []).map(item => {
         let monthlyAmount = item.amount;
         switch (item.frequency) {
           case 'weekly': monthlyAmount = item.amount * 4.33; break;
           case 'yearly': monthlyAmount = item.amount / 12; break;
           case 'one-time': monthlyAmount = item.amount; break;
         }
-        return sum + monthlyAmount;
-      }, 0);
+        return { ...item, monthlyAmount };
+      });
+      const totalExpenses = expenseData.reduce((sum, item) => sum + item.monthlyAmount, 0);
 
-      const investmentValue = (investmentsResult.data || []).reduce((sum, item) => {
-        if (item.quantity && item.current_price) {
-          return sum + (item.quantity * item.current_price);
+      // Calcular investimentos detalhadamente
+      const investmentData = (investmentsResult.data || []).map(inv => {
+        let currentValue;
+        if (inv.quantity && inv.current_price) {
+          currentValue = inv.quantity * inv.current_price;
+        } else {
+          currentValue = inv.current_value || inv.amount || 0;
         }
-        return sum + (item.current_value || item.amount || 0);
-      }, 0);
+        
+        let monthlyIncome = 0;
+        if (inv.dividend_yield && currentValue) {
+          monthlyIncome = (currentValue * inv.dividend_yield / 100) / 12;
+        } else if (inv.monthly_income) {
+          monthlyIncome = inv.monthly_income;
+        }
 
-      const realEstateValue = (realEstateResult.data || []).reduce((sum, item) => {
-        return sum + (item.current_value || item.purchase_price || 0);
-      }, 0);
+        return {
+          ...inv,
+          currentValue,
+          monthlyIncome,
+          profit: currentValue - (inv.amount || 0)
+        };
+      });
+      const totalInvestmentValue = investmentData.reduce((sum, inv) => sum + inv.currentValue, 0);
+      const totalInvestmentIncome = investmentData.reduce((sum, inv) => sum + inv.monthlyIncome, 0);
+      const totalInvestmentProfit = investmentData.reduce((sum, inv) => sum + inv.profit, 0);
 
-      const totalDebt = (debtsResult.data || []).reduce((sum, item) => {
-        return sum + (item.remaining_amount || item.amount || 0);
-      }, 0);
+      // Calcular imóveis detalhadamente
+      const realEstateData = (realEstateResult.data || []).map(property => {
+        const currentValue = property.current_value || property.purchase_price || 0;
+        const monthlyIncome = property.rental_income || 0;
+        const monthlyExpenses = property.monthly_expenses || 0;
+        const netIncome = monthlyIncome - monthlyExpenses;
+        const appreciation = currentValue - (property.purchase_price || 0);
+        
+        return {
+          ...property,
+          currentValue,
+          monthlyIncome,
+          monthlyExpenses,
+          netIncome,
+          appreciation
+        };
+      });
+      const totalRealEstateValue = realEstateData.reduce((sum, prop) => sum + prop.currentValue, 0);
+      const totalRealEstateIncome = realEstateData.reduce((sum, prop) => sum + prop.netIncome, 0);
 
-      // Categorias principais
-      const incomeCategories = [...new Set((incomeResult.data || []).map(item => item.category))];
-      const expenseCategories = [...new Set((expensesResult.data || []).map(item => item.category))];
-      const investmentTypes = [...new Set((investmentsResult.data || []).map(item => item.type))];
-      const goals = (goalsResult.data || []).map(item => item.name);
+      // Calcular veículos
+      const vehicleData = (vehiclesResult.data || []).map(vehicle => ({
+        ...vehicle,
+        currentValue: vehicle.current_value || vehicle.purchase_price || 0,
+        monthlyExpenses: vehicle.monthly_expenses || 0,
+        depreciation: (vehicle.purchase_price || 0) - (vehicle.current_value || 0)
+      }));
+      const totalVehicleValue = vehicleData.reduce((sum, v) => sum + v.currentValue, 0);
+      const totalVehicleExpenses = vehicleData.reduce((sum, v) => sum + v.monthlyExpenses, 0);
 
-      const financialData = {
-        income: Math.round(income),
-        expenses: Math.round(expenses),
-        netIncome: Math.round(income - expenses),
-        investmentValue: Math.round(investmentValue),
-        realEstateValue: Math.round(realEstateValue),
+      // Calcular ativos exóticos
+      const exoticData = (exoticAssetsResult.data || []).map(asset => ({
+        ...asset,
+        currentValue: asset.current_value || asset.purchase_price || 0,
+        appreciation: (asset.current_value || 0) - (asset.purchase_price || 0)
+      }));
+      const totalExoticValue = exoticData.reduce((sum, asset) => sum + asset.currentValue, 0);
+
+      // Calcular dívidas
+      const debtData = (debtsResult.data || []).map(debt => ({
+        ...debt,
+        remainingAmount: debt.remaining_amount || debt.amount || 0,
+        monthlyPayment: debt.monthly_payment || 0
+      }));
+      const totalDebt = debtData.reduce((sum, debt) => sum + debt.remainingAmount, 0);
+      const totalDebtPayments = debtData.reduce((sum, debt) => sum + debt.monthlyPayment, 0);
+
+      // Calcular previdência
+      const retirementData = (retirementResult.data || []).map(plan => ({
+        ...plan,
+        currentBalance: plan.current_balance || 0,
+        monthlyContribution: plan.monthly_contribution || 0
+      }));
+      const totalRetirementSaved = retirementData.reduce((sum, plan) => sum + plan.currentBalance, 0);
+      const totalRetirementContribution = retirementData.reduce((sum, plan) => sum + plan.monthlyContribution, 0);
+
+      // Calcular contas
+      const billData = (billsResult.data || []).filter(bill => bill.is_active).map(bill => ({
+        ...bill,
+        monthlyAmount: bill.amount || 0
+      }));
+      const totalBills = billData.reduce((sum, bill) => sum + bill.monthlyAmount, 0);
+
+      // Calcular metas financeiras
+      const goalData = (goalsResult.data || []).map(goal => ({
+        ...goal,
+        progress: goal.current_amount / goal.target_amount * 100,
+        remaining: goal.target_amount - goal.current_amount
+      }));
+      const totalGoalsSaved = goalData.reduce((sum, goal) => sum + goal.current_amount, 0);
+
+      // Categorias e tipos detalhados
+      const incomeCategories = [...new Set(incomeData.map(item => item.category))];
+      const expenseCategories = [...new Set(expenseData.map(item => item.category))];
+      const investmentTypes = [...new Set(investmentData.map(item => item.type))];
+      const propertyTypes = [...new Set(realEstateData.map(item => item.property_type))];
+      const vehicleTypes = [...new Set(vehicleData.map(item => item.type))];
+      const exoticTypes = [...new Set(exoticData.map(item => item.type))];
+
+      // Cálculos financeiros avançados
+      const totalAssets = totalInvestmentValue + totalRealEstateValue + totalVehicleValue + totalExoticValue + totalRetirementSaved;
+      const netWorth = totalAssets - totalDebt;
+      const totalMonthlyIncome = totalIncome + totalInvestmentIncome + totalRealEstateIncome;
+      const totalMonthlyExpenses = totalExpenses + totalVehicleExpenses + totalDebtPayments + totalBills + totalRetirementContribution;
+      const netMonthlyIncome = totalMonthlyIncome - totalMonthlyExpenses;
+
+      // Ratios e métricas importantes
+      const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0;
+      const debtToIncomeRatio = totalIncome > 0 ? (totalDebt / (totalIncome * 12) * 100) : 0;
+      const investmentToIncomeRatio = totalIncome > 0 ? (totalInvestmentValue / (totalIncome * 12) * 100) : 0;
+      const emergencyFundMonths = totalIncome > 0 ? (totalInvestmentValue / totalMonthlyExpenses) : 0;
+
+      // Montar objeto completo com TODOS os dados
+      const comprehensiveFinancialData = {
+        // Dados básicos
+        totalIncome: Math.round(totalIncome),
+        totalExpenses: Math.round(totalExpenses),
+        netIncome: Math.round(totalIncome - totalExpenses),
+        totalMonthlyIncome: Math.round(totalMonthlyIncome),
+        totalMonthlyExpenses: Math.round(totalMonthlyExpenses),
+        netMonthlyIncome: Math.round(netMonthlyIncome),
+
+        // Investimentos detalhados
+        totalInvestmentValue: Math.round(totalInvestmentValue),
+        totalInvestmentIncome: Math.round(totalInvestmentIncome),
+        totalInvestmentProfit: Math.round(totalInvestmentProfit),
+        investmentCount: investmentData.length,
+        investmentTypes,
+        investments: investmentData,
+
+        // Imóveis detalhados
+        totalRealEstateValue: Math.round(totalRealEstateValue),
+        totalRealEstateIncome: Math.round(totalRealEstateIncome),
+        propertyCount: realEstateData.length,
+        propertyTypes,
+        properties: realEstateData,
+
+        // Veículos
+        totalVehicleValue: Math.round(totalVehicleValue),
+        totalVehicleExpenses: Math.round(totalVehicleExpenses),
+        vehicleCount: vehicleData.length,
+        vehicleTypes,
+        vehicles: vehicleData,
+
+        // Ativos exóticos
+        totalExoticValue: Math.round(totalExoticValue),
+        exoticCount: exoticData.length,
+        exoticTypes,
+        exoticAssets: exoticData,
+
+        // Dívidas e obrigações
         totalDebt: Math.round(totalDebt),
-        netWorth: Math.round(investmentValue + realEstateValue - totalDebt),
+        totalDebtPayments: Math.round(totalDebtPayments),
+        totalBills: Math.round(totalBills),
+        debtCount: debtData.length,
+        billCount: billData.length,
+        debts: debtData,
+        bills: billData,
+
+        // Previdência
+        totalRetirementSaved: Math.round(totalRetirementSaved),
+        totalRetirementContribution: Math.round(totalRetirementContribution),
+        retirementPlans: retirementData,
+
+        // Metas financeiras
+        totalGoalsSaved: Math.round(totalGoalsSaved),
+        goalCount: goalData.length,
+        goals: goalData,
+
+        // Patrimônio e métricas
+        totalAssets: Math.round(totalAssets),
+        netWorth: Math.round(netWorth),
+        
+        // Categorias
         incomeCategories,
         expenseCategories,
-        investmentTypes,
-        goals,
-        // Análise de perfil
-        savingsRate: income > 0 ? ((income - expenses) / income * 100) : 0,
-        debtToIncomeRatio: income > 0 ? (totalDebt / (income * 12) * 100) : 0,
-        investmentToIncomeRatio: income > 0 ? (investmentValue / (income * 12) * 100) : 0
+        
+        // Ratios e análises
+        savingsRate: Math.round(savingsRate * 100) / 100,
+        debtToIncomeRatio: Math.round(debtToIncomeRatio * 100) / 100,
+        investmentToIncomeRatio: Math.round(investmentToIncomeRatio * 100) / 100,
+        emergencyFundMonths: Math.round(emergencyFundMonths * 100) / 100,
+
+        // Dados contextuais
+        bankAccountCount: (bankAccountsResult.data || []).length,
+        recentTransactions: (transactionsResult.data || []).slice(0, 10),
+        
+        // Status e perfil do usuário
+        hasInvestments: investmentData.length > 0,
+        hasRealEstate: realEstateData.length > 0,
+        hasVehicles: vehicleData.length > 0,
+        hasDebts: debtData.length > 0,
+        hasGoals: goalData.length > 0,
+        hasRetirementPlans: retirementData.length > 0,
+        
+        // Análise de perfil financeiro
+        isInvestor: totalInvestmentValue > 10000,
+        isPropertyOwner: realEstateData.length > 0,
+        isDebtFree: totalDebt === 0,
+        hasPositiveCashFlow: netMonthlyIncome > 0,
+        hasEmergencyFund: emergencyFundMonths >= 3,
+        isDiversified: investmentTypes.length >= 3
       };
 
-      setUserFinancialData(financialData);
-
-      // Manter mensagem inicial simples sempre
-      // A análise contextual será feita apenas nas respostas subsequentes
+      setUserFinancialData(comprehensiveFinancialData);
 
     } catch (error) {
-      console.error('Erro ao buscar dados financeiros:', error);
+      console.error('Erro ao buscar dados financeiros completos:', error);
     }
   };
 
