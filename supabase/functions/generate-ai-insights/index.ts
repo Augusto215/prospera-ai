@@ -54,9 +54,9 @@ Deno.serve(async (req) => {
       return corsResponse({ error: 'Unauthorized access' }, 403);
     }
 
-    // Generate insights and ensure recommendations exist
+    // Generate insights and get relevant recommendations
     const insights = await generateSimpleInsights(userId);
-    const recommendations = await ensureRecommendationsExist(userId);
+    const recommendations = await getRelevantRecommendations(userId);
 
     return corsResponse({
       insights,
@@ -68,6 +68,82 @@ Deno.serve(async (req) => {
     return corsResponse({ error: error.message }, 500);
   }
 });
+
+// NOVA FUNÇÃO: Busca recomendações relevantes (não descartadas)
+async function getRelevantRecommendations(userId: string) {
+  try {
+    // Busca recomendações que não foram descartadas pelo usuário
+    const { data: relevantRecs, error } = await supabase.rpc('get_relevant_recommendations_for_user', {
+      p_user_id: userId
+    });
+
+    if (error) {
+      console.error('Error calling get_relevant_recommendations_for_user:', error);
+      // Fallback: busca recomendações normais se a função RPC não existir
+      return await getRecommendationsFallback(userId);
+    }
+
+    // Se não há recomendações relevantes, gera novas
+    if (!relevantRecs || relevantRecs.length === 0) {
+      console.log('No relevant recommendations found, generating new ones...');
+      await ensureRecommendationsExist(userId);
+      
+      // Tenta buscar novamente
+      const { data: newRecs } = await supabase.rpc('get_relevant_recommendations_for_user', {
+        p_user_id: userId
+      });
+      
+      return newRecs || [];
+    }
+
+    return relevantRecs;
+
+  } catch (error) {
+    console.error('Error getting relevant recommendations:', error);
+    return await getRecommendationsFallback(userId);
+  }
+}
+
+// Função de fallback caso a RPC não funcione
+async function getRecommendationsFallback(userId: string) {
+  try {
+    // Busca recomendações que não foram descartadas
+    const { data: interactions } = await supabase
+      .from('user_recommendation_interactions')
+      .select('recommendation_id')
+      .eq('user_id', userId)
+      .eq('interaction_type', 'dismissed');
+
+    const dismissedIds = interactions?.map(i => i.recommendation_id) || [];
+
+    let query = supabase
+      .from('goal_recommendations')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    // Se há IDs descartados, exclui eles
+    if (dismissedIds.length > 0) {
+      query = query.not('id', 'in', `(${dismissedIds.join(',')})`);
+    }
+
+    const { data: recommendations } = await query;
+    
+    // Se não há recomendações, gera novas
+    if (!recommendations || recommendations.length === 0) {
+      await ensureRecommendationsExist(userId);
+      const { data: newRecs } = await query;
+      return newRecs || [];
+    }
+
+    return recommendations;
+
+  } catch (error) {
+    console.error('Error in recommendations fallback:', error);
+    return [];
+  }
+}
 
 async function generateSimpleInsights(userId: string) {
   const now = new Date().toISOString();
@@ -91,24 +167,13 @@ async function generateSimpleInsights(userId: string) {
   insights.push({
     id: `feature-ai-recommendations-${Date.now()}`,
     type: 'feature',
-    title: 'IA Aprimorada: Recomendações Automáticas',
-    description: 'Nossa IA agora gera recomendações personalizadas baseadas no seu comportamento financeiro para ajudar você a economizar mais.',
+    title: 'IA Aprimorada: Recomendações Inteligentes',
+    description: 'Nossa IA agora aprende com suas preferências! Salve, avalie e descarte recomendações para receber sugestões cada vez mais personalizadas.',
     impact: 'high',
     date: now,
     action_path: 'insights',
     action_label: 'Ver Recomendações'
   });
-
-  // insights.push({
-  //   id: `feature-family-sharing-${Date.now()}`,
-  //   type: 'feature',
-  //   title: 'Novo: Compartilhamento Familiar',
-  //   description: 'Agora você pode compartilhar o acesso à sua conta com até 5 membros da família. Gerencie as finanças em conjunto!',
-  //   impact: 'high',
-  //   date: now,
-  //   action_path: 'access',
-  //   action_label: 'Configurar Família'
-  // });
 
   // Generate data-driven insights only if user has sufficient data
   if (transactions && transactions.length >= 5) {
@@ -300,16 +365,24 @@ async function generateSimpleInsights(userId: string) {
 
 async function ensureRecommendationsExist(userId: string) {
   try {
-    // First, get existing recommendations
+    // Verifica se já existem recomendações relevantes (não descartadas)
     const { data: existingRecs } = await supabase
       .from('goal_recommendations')
-      .select('*')
+      .select(`
+        *,
+        user_recommendation_relevance!left(is_dismissed, relevance_score)
+      `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    // If we have recommendations, return them
-    if (existingRecs && existingRecs.length > 0) {
-      return existingRecs;
+    // Filtra recomendações não descartadas
+    const activeRecs = existingRecs?.filter(rec => 
+      !rec.user_recommendation_relevance?.is_dismissed
+    ) || [];
+
+    // Se temos recomendações ativas suficientes, retorna elas
+    if (activeRecs.length >= 3) {
+      return activeRecs;
     }
 
     // Fetch real user data to generate personalized recommendations
@@ -338,7 +411,7 @@ async function ensureRecommendationsExist(userId: string) {
 
     // Only insert if we have recommendations to create
     if (recommendations.length === 0) {
-      return [];
+      return activeRecs;
     }
 
     // Insert personalized recommendations
@@ -349,10 +422,24 @@ async function ensureRecommendationsExist(userId: string) {
 
     if (error) {
       console.error('Error creating personalized recommendations:', error);
-      return [];
+      return activeRecs;
     }
 
-    return newRecs || [];
+    // Inicializa a relevância das novas recomendações
+    if (newRecs && newRecs.length > 0) {
+      const relevanceInserts = newRecs.map(rec => ({
+        user_id: userId,
+        recommendation_id: rec.id,
+        relevance_score: 1.0,
+        is_dismissed: false
+      }));
+
+      await supabase
+        .from('user_recommendation_relevance')
+        .insert(relevanceInserts);
+    }
+
+    return [...activeRecs, ...(newRecs || [])];
 
   } catch (error) {
     console.error('Error ensuring recommendations exist:', error);

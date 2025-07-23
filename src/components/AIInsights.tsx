@@ -17,7 +17,12 @@ import {
   Clock,
   CheckCheck,
   ArrowUpCircle,
-  ExternalLink
+  ExternalLink,
+  BookmarkPlus,
+  Eye,
+  Star,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,7 +34,9 @@ export default function AIInsights() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [aiScore, setAiScore] = useState<number>(0);
-  const [applyingRecommendation, setApplyingRecommendation] = useState<string | null>(null);
+  const [savedRecommendations, setSavedRecommendations] = useState<Set<string>>(new Set());
+  const [viewedRecommendations, setViewedRecommendations] = useState<Set<string>>(new Set());
+  const [ratedRecommendations, setRatedRecommendations] = useState<Map<string, 'up' | 'down'>>(new Map());
   const { user } = useAuth();
 
   React.useEffect(() => {
@@ -53,8 +60,18 @@ export default function AIInsights() {
       
       if (data) {
         setInsights(data.insights || []);
-        setRecommendations(data.recommendations || []);
+        
+        // Carrega apenas recomendações relevantes (não descartadas)
+        const filteredRecommendations = (data.recommendations || []).filter(rec => {
+          // Aqui você pode implementar lógica mais complexa de relevância
+          return rec.relevance_score > 0.3; // Exemplo: só mostra se relevância > 30%
+        });
+        
+        setRecommendations(filteredRecommendations);
         setAiScore(data.score || 0);
+        
+        // Carrega estados salvos das interações do usuário
+        await loadUserInteractions(filteredRecommendations.map(r => r.id));
       }
     } catch (err) {
       console.error('Error generating AI insights:', err);
@@ -64,84 +81,189 @@ export default function AIInsights() {
     }
   };
 
-  // Função corrigida para aplicar recomendação
-  const applyRecommendation = async (recId: string) => {
+  // Função para carregar interações do usuário
+  const loadUserInteractions = async (recommendationIds: string[]) => {
     try {
-      setApplyingRecommendation(recId);
-      setError(null);
-      
-      console.log('Aplicando recomendação:', recId);
-      
-      // Verifica se a recomendação existe
-      const recommendation = recommendations.find(r => r.id === recId);
-      if (!recommendation) {
-        throw new Error('Recomendação não encontrada');
-      }
-      
-      if (recommendation.is_applied) {
-        throw new Error('Esta recomendação já foi aplicada');
-      }
-      
-      // Chama função serverless para aplicar recomendação
-      const { data, error: apiError } = await supabase.functions.invoke('apply-recommendation', {
-        body: { userId: user?.id, recommendationId: recId }
+      const { data: interactions, error } = await supabase
+        .from('user_recommendation_interactions')
+        .select('*')
+        .eq('user_id', user?.id)
+        .in('recommendation_id', recommendationIds);
+
+      if (error) throw error;
+
+      // Processa as interações carregadas
+      const savedSet = new Set<string>();
+      const viewedSet = new Set<string>();
+      const ratedMap = new Map<string, 'up' | 'down'>();
+
+      interactions?.forEach(interaction => {
+        switch (interaction.interaction_type) {
+          case 'saved':
+            savedSet.add(interaction.recommendation_id);
+            break;
+          case 'viewed':
+            viewedSet.add(interaction.recommendation_id);
+            break;
+          case 'rated':
+            ratedMap.set(interaction.recommendation_id, interaction.interaction_value as 'up' | 'down');
+            break;
+        }
       });
-      
-      if (apiError) {
-        console.error('API Error:', apiError);
-        throw new Error(`Erro na API: ${apiError.message || 'Função não encontrada'}`);
-      }
-      
-      if (data && data.error) {
-        throw new Error(data.error);
-      }
-      
-      // Atualiza o estado local da recomendação
-      setRecommendations(prev => 
-        prev.map(rec => 
-          rec.id === recId ? { ...rec, is_applied: true } : rec
-        )
-      );
-      
-      // Mostra feedback de sucesso
-      const successMessage = data?.data?.message || data?.message || 'Sugestão aplicada com sucesso!';
-      setError(`✅ ${successMessage}`);
-      
-      // Atualiza insights após aplicar recomendação
-      setTimeout(() => {
-        generateInsights();
-        setError(null);
-      }, 3000);
-      
-    } catch (err: any) {
-      console.error('Error applying recommendation:', err);
-      let errorMessage = 'Erro ao aplicar sugestão.';
-      
-      // Mensagens de erro mais específicas
-      if (err.message?.includes('não encontrada')) {
-        errorMessage = 'Função não encontrada. Verifique se as Edge Functions estão configuradas.';
-      } else if (err.message?.includes('Unauthorized')) {
-        errorMessage = 'Erro de autorização. Faça login novamente.';
-      } else if (err.message?.includes('já foi aplicada')) {
-        errorMessage = 'Esta recomendação já foi aplicada anteriormente.';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
-      
-      // Remove erro após 5 segundos
-      setTimeout(() => setError(null), 5000);
-    } finally {
-      setApplyingRecommendation(null);
+
+      setSavedRecommendations(savedSet);
+      setViewedRecommendations(viewedSet);
+      setRatedRecommendations(ratedMap);
+
+    } catch (err) {
+      console.error('Error loading user interactions:', err);
     }
   };
 
-  // Função para aplicar recomendação de insight
-  const applyInsightRecommendation = async (insightId: string) => {
-    // Extrai o ID da recomendação do insight
-    const recId = insightId.replace('rec-', '');
-    await applyRecommendation(recId);
+  // Função para salvar/favoritar uma recomendação
+  const toggleSaveRecommendation = async (recId: string) => {
+    try {
+      const isSaved = savedRecommendations.has(recId);
+      
+      if (isSaved) {
+        setSavedRecommendations(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(recId);
+          return newSet;
+        });
+        
+        // Remove da tabela de interações
+        await supabase
+          .from('user_recommendation_interactions')
+          .delete()
+          .eq('user_id', user?.id)
+          .eq('recommendation_id', recId)
+          .eq('interaction_type', 'saved');
+      } else {
+        setSavedRecommendations(prev => new Set(prev).add(recId));
+        
+        // Salva na tabela de interações
+        await supabase
+          .from('user_recommendation_interactions')
+          .upsert({
+            user_id: user?.id,
+            recommendation_id: recId,
+            interaction_type: 'saved'
+          });
+      }
+      
+    } catch (err) {
+      console.error('Error saving recommendation:', err);
+    }
+  };
+
+  // Função para marcar como visualizada
+  const markAsViewed = async (recId: string) => {
+    try {
+      setViewedRecommendations(prev => new Set(prev).add(recId));
+      
+      // Salva no banco que foi visualizada
+      await supabase
+        .from('user_recommendation_interactions')
+        .upsert({
+          user_id: user?.id,
+          recommendation_id: recId,
+          interaction_type: 'viewed'
+        });
+    } catch (err) {
+      console.error('Error marking as viewed:', err);
+    }
+  };
+
+  // Função para avaliar recomendação
+  const rateRecommendation = async (recId: string, rating: 'up' | 'down') => {
+    try {
+      const currentRating = ratedRecommendations.get(recId);
+      
+      if (currentRating === rating) {
+        // Se clicou na mesma avaliação, remove
+        setRatedRecommendations(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(recId);
+          return newMap;
+        });
+        
+        // Remove do banco
+        await supabase
+          .from('user_recommendation_interactions')
+          .delete()
+          .eq('user_id', user?.id)
+          .eq('recommendation_id', recId)
+          .eq('interaction_type', 'rated');
+      } else {
+        // Adiciona ou atualiza a avaliação
+        setRatedRecommendations(prev => new Map(prev).set(recId, rating));
+        
+        // Salva no banco
+        await supabase
+          .from('user_recommendation_interactions')
+          .upsert({
+            user_id: user?.id,
+            recommendation_id: recId,
+            interaction_type: 'rated',
+            interaction_value: rating
+          });
+      }
+      
+    } catch (err) {
+      console.error('Error rating recommendation:', err);
+    }
+  };
+
+  // Função para descartar/excluir recomendação permanentemente
+  const dismissRecommendation = async (recId: string) => {
+    try {
+      // Marca como descartada na tabela de relevância
+      await supabase
+        .from('user_recommendation_relevance')
+        .upsert({
+          user_id: user?.id,
+          recommendation_id: recId,
+          is_dismissed: true,
+          relevance_score: 0.0
+        });
+      
+      // Adiciona interação de descarte
+      await supabase
+        .from('user_recommendation_interactions')
+        .upsert({
+          user_id: user?.id,
+          recommendation_id: recId,
+          interaction_type: 'dismissed'
+        });
+      
+      // Remove da lista local
+      setRecommendations(prev => prev.filter(r => r.id !== recId));
+      
+      // Remove dos salvos se estava salva
+      setSavedRecommendations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(recId);
+        return newSet;
+      });
+      
+      // Remove das visualizadas
+      setViewedRecommendations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(recId);
+        return newSet;
+      });
+      
+      // Remove das avaliações
+      setRatedRecommendations(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(recId);
+        return newMap;
+      });
+      
+    } catch (err) {
+      console.error('Error dismissing recommendation:', err);
+    }
   };
 
   // Função para navegar para ações específicas
@@ -149,26 +271,20 @@ export default function AIInsights() {
     console.log('Navegando para:', actionPath, actionLabel);
     
     if (actionPath.startsWith('http')) {
-      // Links externos
       window.open(actionPath, '_blank');
     } else if (actionPath.startsWith('/')) {
-      // Rotas internas usando o mesmo sistema da sidebar
-      const tabName = actionPath.substring(1); // Remove a barra inicial
+      const tabName = actionPath.substring(1);
       navigateToTab(tabName);
     } else {
-      // Ações customizadas
       handleCustomAction(actionPath, actionLabel);
     }
   };
 
-  // Função para navegar usando o sistema de tabs da sidebar
   const navigateToTab = (tabName: string) => {
-    // Dispara evento customizado que a sidebar escuta
     const event = new CustomEvent('prospera-set-tab', { detail: tabName });
     window.dispatchEvent(event);
   };
 
-  // Função para ações customizadas
   const handleCustomAction = (actionPath: string, actionLabel: string) => {
     console.log('Ação customizada:', actionPath, actionLabel);
     
@@ -192,7 +308,6 @@ export default function AIInsights() {
         navigateToTab('access');
         break;
       case 'insights':
-        // Já está na página de insights, rola direto para as recomendações
         setTimeout(() => {
           const recommendationsSection = document.querySelector('[data-section="recommendations"]');
           if (recommendationsSection) {
@@ -204,8 +319,7 @@ export default function AIInsights() {
         }, 100);
         break;
       default:
-        // Para ações não mapeadas, mostra modal informativo
-        alert(`🔧 Funcionalidade em Desenvolvimento\n\nAção: ${actionLabel}\nEsta funcionalidade será implementada em breve.\n\nEnquanto isso, você pode:\n• Explorar outras seções\n• Aplicar outras recomendações\n• Verificar suas metas e orçamentos`);
+        alert(`🔧 Funcionalidade em Desenvolvimento\n\nAção: ${actionLabel}\nEsta funcionalidade será implementada em breve.\n\nEnquanto isso, você pode:\n• Explorar outras seções\n• Salvar recomendações interessantes\n• Verificar suas metas e orçamentos`);
     }
   };
 
@@ -288,8 +402,8 @@ export default function AIInsights() {
 
   // Estatísticas das recomendações
   const totalPotentialSavings = recommendations.reduce((sum, rec) => sum + (rec.potential_savings || 0), 0);
-  const appliedRecommendations = recommendations.filter(r => r.is_applied);
-  const pendingRecommendations = recommendations.filter(r => !r.is_applied);
+  const savedCount = savedRecommendations.size;
+  const pendingRecommendations = recommendations.filter(r => !viewedRecommendations.has(r.id));
 
   return (
     <div className="space-y-6">
@@ -416,20 +530,20 @@ export default function AIInsights() {
           <div className="bg-white p-4 rounded-xl shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Aplicadas</p>
-                <p className="font-bold text-lg text-green-700">{appliedRecommendations.length}</p>
+                <p className="text-gray-600 text-sm">Salvas</p>
+                <p className="font-bold text-lg text-green-700">{savedCount}</p>
               </div>
-              <CheckCheck className="h-8 w-8 text-green-600" />
+              <Star className="h-8 w-8 text-green-600" />
             </div>
           </div>
           
           <div className="bg-white p-4 rounded-xl shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Pendentes</p>
+                <p className="text-gray-600 text-sm">Novas</p>
                 <p className="font-bold text-lg text-orange-700">{pendingRecommendations.length}</p>
               </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+              <Sparkles className="h-8 w-8 text-orange-600" />
             </div>
           </div>
         </div>
@@ -438,7 +552,7 @@ export default function AIInsights() {
         {recommendations.length > 0 && (
           <div className="space-y-3">
             <h3 className="font-semibold text-gray-800 mb-3">Suas Recomendações:</h3>
-            {recommendations.slice(0, 3).map((rec) => (
+            {recommendations.map((rec) => (
               <div key={rec.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -447,9 +561,14 @@ export default function AIInsights() {
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${getPriorityColor(rec.priority)}`}>
                         {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Média' : 'Baixa'}
                       </span>
-                      {rec.is_applied && (
-                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700">
-                          Aplicada
+                      {!viewedRecommendations.has(rec.id) && (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
+                          Nova
+                        </span>
+                      )}
+                      {savedRecommendations.has(rec.id) && (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-yellow-100 text-yellow-700">
+                          Salva
                         </span>
                       )}
                     </div>
@@ -461,27 +580,62 @@ export default function AIInsights() {
                     </div>
                   </div>
                   
-                  {!rec.is_applied && (
+                  <div className="ml-4 flex flex-col space-y-2">
+                    {/* Botão para salvar/favoritar */}
                     <button
-                      onClick={() => applyRecommendation(rec.id)}
-                      disabled={applyingRecommendation === rec.id}
-                      className="ml-4 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium transition-colors duration-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => toggleSaveRecommendation(rec.id)}
+                      className={`p-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                        savedRecommendations.has(rec.id)
+                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                      title={savedRecommendations.has(rec.id) ? 'Remover dos salvos' : 'Salvar recomendação'}
                     >
-                      {applyingRecommendation === rec.id ? 'Aplicando...' : 'Aplicar'}
+                      <BookmarkPlus className="h-4 w-4" />
                     </button>
-                  )}
+
+                    {/* Botão para marcar como vista */}
+                    <button
+                      onClick={() => markAsViewed(rec.id)}
+                      className={`p-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                        viewedRecommendations.has(rec.id)
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                      }`}
+                      title="Marcar como vista"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+
+                    {/* Botões de avaliação */}
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => rateRecommendation(rec.id, 'up')}
+                        className={`p-1 rounded text-xs transition-colors duration-200 ${
+                          ratedRecommendations.get(rec.id) === 'up'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-600 hover:bg-green-100'
+                        }`}
+                        title="Útil"
+                      >
+                        <ThumbsUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => rateRecommendation(rec.id, 'down')}
+                        className={`p-1 rounded text-xs transition-colors duration-200 ${
+                          ratedRecommendations.get(rec.id) === 'down'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-600 hover:bg-red-100'
+                        }`}
+                        title="Não útil"
+                      >
+                        <ThumbsDown className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
-            
-            {recommendations.length > 3 && (
-              <button
-                onClick={() => setSelectedFilter('suggestion')}
-                className="w-full py-2 text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors duration-200"
-              >
-                Ver todas as {recommendations.length} recomendações
-              </button>
-            )}
           </div>
         )}
         
@@ -646,46 +800,29 @@ export default function AIInsights() {
                         </div>
                         
                         <div className="flex flex-wrap gap-2">
-                          {/* Botão Aplicar para insights com recomendações */}
-                          {insight.type === 'suggestion' && insight.id.startsWith('rec-') && (
-                            <button 
-                              onClick={() => applyInsightRecommendation(insight.id)}
-                              disabled={applyingRecommendation === insight.id.replace('rec-', '')}
-                              className="px-3 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors duration-200 hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-1"
-                              type="button"
-                            >
-                              {applyingRecommendation === insight.id.replace('rec-', '') ? (
-                                <span>Aplicando...</span>
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-3 w-3" />
-                                  <span>Aplicar</span>
-                                </>
-                              )}
-                            </button>
-                          )}
-                          
                           {/* Botão de ação personalizada */}
                           {insight.action_path && (
                             <button 
                               onClick={() => handleActionClick(insight.action_path, insight.action_label || 'Ver Detalhes')}
-                              className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition-colors duration-200 flex items-center space-x-1"
+                              className={`px-3 sm:px-4 py-1 sm:py-2 ${colors.button} text-white rounded-lg text-xs sm:text-sm font-medium transition-colors duration-200 flex items-center space-x-1`}
                             >
                               <ExternalLink className="h-3 w-3" />
-                              <span>{insight.action_label || 'Ver Detalhes'}</span>
+                              <span>{insight.action_label || 'Explorar'}</span>
                             </button>
                           )}
                           
-                          {/* Botão padrão quando não há ação específica */}
-                          {!insight.action_path && insight.type !== 'suggestion' && (
-                            <button 
-                              type="button"
-                              onClick={() => alert(`${insight.title}\n\n${insight.description}`)}
-                              className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition-colors duration-200"
-                            >
-                              Ver Detalhes
-                            </button>
-                          )}
+                          {/* Botão para marcar como lido/importante */}
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              // Aqui você pode implementar lógica para marcar como lido ou importante
+                              alert(`Insight marcado!\n\n${insight.title}\n\n${insight.description}`);
+                            }}
+                            className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition-colors duration-200 flex items-center space-x-1"
+                          >
+                            <Eye className="h-3 w-3" />
+                            <span>Ver Detalhes</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -697,12 +834,33 @@ export default function AIInsights() {
         </div>
       )}
 
-      {/* Feedback de sucesso */}
-      {error && error.includes('✅') && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white p-4 rounded-lg shadow-lg z-50">
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="h-5 w-5" />
-            <span>{error}</span>
+      {/* Seção de recomendações salvas */}
+      {savedRecommendations.size > 0 && (
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <Star className="h-5 w-5 text-yellow-600" />
+            <h3 className="font-semibold text-gray-800">Recomendações Salvas ({savedRecommendations.size})</h3>
+          </div>
+          <div className="grid gap-3">
+            {recommendations
+              .filter(rec => savedRecommendations.has(rec.id))
+              .map(rec => (
+                <div key={rec.id} className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-800 text-sm">{rec.title}</h4>
+                      <p className="text-xs text-gray-600 mt-1">💰 R$ {rec.potential_savings}/mês</p>
+                    </div>
+                    <button
+                      onClick={() => toggleSaveRecommendation(rec.id)}
+                      className="text-yellow-600 hover:text-yellow-700"
+                      title="Remover dos salvos"
+                    >
+                      <Star className="h-4 w-4 fill-current" />
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}
@@ -744,10 +902,54 @@ export default function AIInsights() {
           
           <div className="text-center col-span-1 md:col-span-1">
             <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm mb-2 sm:mb-3">
-              <Lock className="h-8 w-8 text-purple-600 mx-auto" />
+              <Sparkles className="h-8 w-8 text-purple-600 mx-auto" />
             </div>
             <h3 className="font-semibold text-gray-800 mb-1 text-sm sm:text-base">Oportunidades</h3>
             <p className="text-xs sm:text-sm text-gray-600">Economia e investimento</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Seção de estatísticas da IA */}
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+        <div className="flex items-center space-x-2 mb-6">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-2 rounded-xl">
+            <Brain className="h-5 w-5 text-white" />
+          </div>
+          <h3 className="font-semibold text-gray-800">Estatísticas da IA</h3>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="bg-blue-50 p-3 rounded-xl mb-2">
+              <Eye className="h-6 w-6 text-blue-600 mx-auto" />
+            </div>
+            <p className="text-lg font-bold text-gray-800">{insights.length}</p>
+            <p className="text-xs text-gray-600">Total de Insights</p>
+          </div>
+          
+          <div className="text-center">
+            <div className="bg-green-50 p-3 rounded-xl mb-2">
+              <CheckCircle className="h-6 w-6 text-green-600 mx-auto" />
+            </div>
+            <p className="text-lg font-bold text-gray-800">{viewedRecommendations.size}</p>
+            <p className="text-xs text-gray-600">Recomendações Vistas</p>
+          </div>
+          
+          <div className="text-center">
+            <div className="bg-yellow-50 p-3 rounded-xl mb-2">
+              <Star className="h-6 w-6 text-yellow-600 mx-auto" />
+            </div>
+            <p className="text-lg font-bold text-gray-800">{savedRecommendations.size}</p>
+            <p className="text-xs text-gray-600">Favoritas</p>
+          </div>
+          
+          <div className="text-center">
+            <div className="bg-purple-50 p-3 rounded-xl mb-2">
+              <TrendingUp className="h-6 w-6 text-purple-600 mx-auto" />
+            </div>
+            <p className="text-lg font-bold text-gray-800">{aiScore}%</p>
+            <p className="text-xs text-gray-600">Score IA</p>
           </div>
         </div>
       </div>
