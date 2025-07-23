@@ -60,27 +60,35 @@ export default function Transactions() {
       setLoading(true);
       
       // Buscar receitas da tabela income_sources
-      const { data: incomeData, error: incomeError } = await supabase
-        .from('income_sources')
-        .select('id, name, amount, category, next_payment, created_at, updated_at')
+      const transactionsData = await supabase
+        .from('transactions')
+        .select('id, type, description, amount, category, created_at, updated_at, date')
         .eq('user_id', user?.id)
-        .eq('frequency', 'one-time') // Apenas transações únicas
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59.999Z');
+      console.log(transactionsData);
+
+      const { data: incomeData, error: incomeError } = await supabase
+        .from('transactions')
+        .select('id, type, description, amount, category, created_at, updated_at, date')
+        .eq('user_id', user?.id)
+        .eq('type', 'income')
         .gte('created_at', startDate)
         .lte('created_at', endDate + 'T23:59:59.999Z');
 
-      if (incomeError) {
+      if (transactionsData?.data) {
         console.error('Income error:', incomeError);
       }
 
       // Buscar despesas da tabela expenses  
       const { data: expenseData, error: expenseError } = await supabase
-        .from('expenses')
-        .select('id, name, amount, category, created_at, updated_at')
+        .from('transactions')
+        .select('id, type, description, amount, category, created_at, updated_at, date')
         .eq('user_id', user?.id)
-        .eq('frequency', 'one-time') // Apenas transações únicas
+        .eq('type', 'expense')
         .gte('created_at', startDate)
         .lte('created_at', endDate + 'T23:59:59.999Z');
-
+      
       if (expenseError) {
         console.error('Expense error:', expenseError);
       }
@@ -91,9 +99,9 @@ export default function Transactions() {
         type: 'income' as const,
         amount: item.amount,
         category: item.category || 'Sem categoria',
-        description: item.name,
-        date: item.next_payment || item.created_at,
-        created_at: item.created_at,
+        description: item.description,
+        date: item.date || item.created_at,
+        created_at: item.date,
         updated_at: item.updated_at
       }));
 
@@ -102,24 +110,25 @@ export default function Transactions() {
         type: 'expense' as const,
         amount: item.amount,
         category: item.category || 'Sem categoria',
-        description: item.name,
-        date: item.created_at, // Para expenses, usar created_at como data da transação
+        description: item.description,
+        date: item.date || item.created_at, // Para expenses, usar created_at como data da transação
         created_at: item.created_at,
         updated_at: item.updated_at
       }));
 
       // Combinar e ordenar por data
-      let allTransactions = [...incomeTransactions, ...expenseTransactions];
+      // let allTransactions = [...incomeTransactions, ...expenseTransactions];
       
+      let allTransactions = transactionsData?.data;
       // Filtrar por tipo se necessário
       if (selectedType !== 'all') {
-        allTransactions = allTransactions.filter(t => t.type === selectedType);
+        allTransactions = transactionsData?.data?.filter(t => t.type === selectedType) || null;
       }
 
       // Ordenar por data (mais recente primeiro)
-      allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      allTransactions?.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-      setTransactions(allTransactions);
+      setTransactions(allTransactions || []);
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setError('Erro ao carregar transações');
@@ -133,28 +142,30 @@ export default function Transactions() {
       if (transactionData.type === 'income') {
         // Salvar receitas na tabela income_sources
         const { error } = await supabase
-          .from('income_sources')
+          .from('transactions')
           .insert([{
             user_id: user?.id,
-            name: transactionData.description,
+            description: transactionData.description,
+            type: 'income',
             amount: transactionData.amount,
-            frequency: 'one-time', // Transações são sempre únicas
             category: transactionData.category,
-            is_active: true
+            is_active: true,
+            date: transactionData.date
           }]);
 
         if (error) throw error;
       } else {
         // Salvar despesas na tabela expenses
         const { error } = await supabase
-          .from('expenses')
+          .from('transactions')
           .insert([{
             user_id: user?.id,
-            name: transactionData.description,
+            description: transactionData.description,
             amount: transactionData.amount,
-            frequency: 'one-time', // Transações são sempre únicas
+            //is_recurring: transactionData.is_recuring, // Transações são sempre únicas
+            type: 'expense',
             category: transactionData.category,
-            is_active: true
+            date: transactionData.date
           }]);
 
         if (error) throw error;
