@@ -38,6 +38,10 @@ interface ExpenseItem {
 
 export default function ExpenseManagement() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [vehicleDepreciation, setVehicleDepreciation] = useState<number>(0);
+  const [ipva, setIpva] = useState<number>(0);
+  const [iptu, setIptu] = useState<number>(0);
+  const [retirementContributions, setRetirementContributions] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,7 +75,7 @@ export default function ExpenseManagement() {
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .eq('type', 'expense')
         .gte('created_at', startDate)
         .lte('created_at', endDate + 'T23:59:59.999Z')
@@ -271,6 +275,49 @@ export default function ExpenseManagement() {
       }
 
       setExpenses(allExpenses);
+      // Veículos: depreciação e IPVA
+      const { data: vehiclesData } = await supabase
+        .from('vehicles')
+        .select('depreciation, ipva')
+        .eq('user_id', user?.id);
+      let totalVehicleDepreciation = 0;
+      let totalIpva = 0;
+      if (vehiclesData && vehiclesData.length > 0) {
+        vehiclesData.forEach((v: any) => {
+          totalVehicleDepreciation += Number(v.depreciation || 0);
+          totalIpva += Number(v.ipva || 0);
+        });
+      }
+      setVehicleDepreciation(totalVehicleDepreciation);
+      setIpva(totalIpva);
+
+      // Imóveis: IPTU (se não alugado)
+      const { data: realEstateData } = await supabase
+        .from('real_estate')
+        .select('iptu, is_rented')
+        .eq('user_id', user?.id);
+      let totalIptu = 0;
+      if (realEstateData && realEstateData.length > 0) {
+        realEstateData.forEach((re: any) => {
+          if (!re.is_rented) {
+            totalIptu += Number(re.iptu || 0);
+          }
+        });
+      }
+      setIptu(totalIptu);
+
+      // Previdência (retirement)
+      const { data: retirementData } = await supabase
+        .from('retirement_plans')
+        .select('contribution')
+        .eq('user_id', user?.id);
+      let totalRetirement = 0;
+      if (retirementData && retirementData.length > 0) {
+        retirementData.forEach((r: any) => {
+          totalRetirement += Number(r.contribution || 0);
+        });
+      }
+      setRetirementContributions(totalRetirement);
     } catch (err) {
       console.error('Error fetching expenses:', err);
       setError('Erro ao carregar despesas');
@@ -348,6 +395,8 @@ export default function ExpenseManagement() {
     });
 
   const totalExpenses = filteredAndSortedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  // Soma total incluindo custos agregados
+  const totalExpensesWithExtras = totalExpenses + vehicleDepreciation + ipva + iptu + retirementContributions;
   const expensesByType = filteredAndSortedExpenses.reduce((acc, expense) => {
     acc[expense.type] = (acc[expense.type] || 0) + expense.amount;
     return acc;
@@ -394,10 +443,10 @@ export default function ExpenseManagement() {
             <div>
               <p className="text-red-100 text-sm font-medium">Total de Gastos</p>
               <p className="text-3xl font-bold mt-1">
-                R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {totalExpensesWithExtras.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-red-100 text-xs mt-1">
-                Período: {new Date(startDate).toLocaleDateString('pt-BR')} - {new Date(endDate).toLocaleDateString('pt-BR')}
+                Inclui depreciação, IPVA, IPTU, previdência
               </p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">

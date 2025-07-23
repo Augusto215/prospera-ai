@@ -23,6 +23,16 @@ export default function RevenueManagement() {
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalMonthlyIncome, setTotalMonthlyIncome] = useState(0);
+  const [investmentYields, setInvestmentYields] = useState<number>(0);
+  const [dividends, setDividends] = useState<number>(0);
+  const [rentalIncome, setRentalIncome] = useState<number>(0);
+  const [oneOffTransactions, setOneOffTransactions] = useState<number>(0);
+  const [vehicleDepreciation, setVehicleDepreciation] = useState<number>(0);
+  const [ipva, setIpva] = useState<number>(0);
+  const [iptu, setIptu] = useState<number>(0);
+  const [retirementContributions, setRetirementContributions] = useState<number>(0);
+  const [totalCosts, setTotalCosts] = useState<number>(0);
+  const [netBalance, setNetBalance] = useState<number>(0);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,34 +59,112 @@ export default function RevenueManagement() {
 
   useEffect(() => {
     if (user) {
-      fetchIncomeSources();
+      fetchAllFinancialData();
     }
   }, [user, startDate, endDate]);
 
-  const fetchIncomeSources = async () => {
+  // Função agregadora: busca e calcula todas as receitas e custos relevantes
+  const fetchAllFinancialData = async () => {
     setLoading(true);
     try {
-      // Fetch da tabela income_sources com filtro de data
+      // 1. Income Sources
       const { data: incomeSourcesData, error: incomeError } = await supabase
         .from('income_sources')
         .select('*')
         .eq('user_id', user?.id)
         .gte('created_at', startDate)
-        .lte('created_at', endDate + 'T23:59:59.999Z') // Incluir o dia completo
+        .lte('created_at', endDate + 'T23:59:59.999Z')
         .order('created_at', { ascending: false });
-
       if (incomeError) throw incomeError;
-      
       const allIncomeSources = incomeSourcesData || [];
-
       setIncomeSources(allIncomeSources);
-      
-      // Calcular total mensal - INCLUINDO transações únicas do período (igual ao Dashboard)
-      const total = allIncomeSources
+
+      // 2. Investments (rendimentos, dividendos)
+      const { data: investmentsData } = await supabase
+        .from('investments')
+        .select('yield, dividends')
+        .eq('user_id', user?.id);
+      let totalInvestmentYields = 0;
+      let totalDividends = 0;
+      if (investmentsData && investmentsData.length > 0) {
+        investmentsData.forEach((inv: any) => {
+          totalInvestmentYields += Number(inv.yield || 0);
+          totalDividends += Number(inv.dividends || 0);
+        });
+      }
+      setInvestmentYields(totalInvestmentYields);
+      setDividends(totalDividends);
+
+      // 3. Real Estate (rental income, IPTU)
+      const { data: realEstateData } = await supabase
+        .from('real_estate')
+        .select('rental_income, iptu, is_rented')
+        .eq('user_id', user?.id);
+      let totalRentalIncome = 0;
+      let totalIptu = 0;
+      if (realEstateData && realEstateData.length > 0) {
+        realEstateData.forEach((re: any) => {
+          if (re.is_rented) {
+            totalRentalIncome += Number(re.rental_income || 0);
+          } else {
+            totalIptu += Number(re.iptu || 0);
+          }
+        });
+      }
+      setRentalIncome(totalRentalIncome);
+      setIptu(totalIptu);
+
+      // 4. Vehicles (depreciação, IPVA)
+      const { data: vehiclesData } = await supabase
+        .from('vehicles')
+        .select('depreciation, ipva')
+        .eq('user_id', user?.id);
+      let totalVehicleDepreciation = 0;
+      let totalIpva = 0;
+      if (vehiclesData && vehiclesData.length > 0) {
+        vehiclesData.forEach((v: any) => {
+          totalVehicleDepreciation += Number(v.depreciation || 0);
+          totalIpva += Number(v.ipva || 0);
+        });
+      }
+      setVehicleDepreciation(totalVehicleDepreciation);
+      setIpva(totalIpva);
+
+      // 5. One-off transactions (transações únicas)
+      const { data: transactionsData } = await supabase
+        .from('transactions')
+        .select('amount, type, date')
+        .eq('user_id', user?.id)
+        .gte('date', startDate)
+        .lte('date', endDate + 'T23:59:59.999Z');
+      let totalOneOff = 0;
+      if (transactionsData && transactionsData.length > 0) {
+        transactionsData.forEach((t: any) => {
+          if (t.type === 'one-time') {
+            totalOneOff += Number(t.amount || 0);
+          }
+        });
+      }
+      setOneOffTransactions(totalOneOff);
+
+      // 6. Retirement (previdência)
+      const { data: retirementData } = await supabase
+        .from('retirement_plans')
+        .select('contribution')
+        .eq('user_id', user?.id);
+      let totalRetirement = 0;
+      if (retirementData && retirementData.length > 0) {
+        retirementData.forEach((r: any) => {
+          totalRetirement += Number(r.contribution || 0);
+        });
+      }
+      setRetirementContributions(totalRetirement);
+
+      // 7. Calcular total de receitas (painel + extras)
+      const totalIncomePanel = allIncomeSources
         .filter(source => source.is_active)
         .reduce((sum, source) => {
           let monthlyAmount = source.amount;
-          
           switch (source.frequency) {
             case 'weekly':
               monthlyAmount = source.amount * 4.33;
@@ -85,19 +173,25 @@ export default function RevenueManagement() {
               monthlyAmount = source.amount / 12;
               break;
             case 'one-time':
-              // INCLUIR transações únicas que estão no período selecionado
               monthlyAmount = source.amount;
               break;
             default:
               monthlyAmount = source.amount;
           }
-          
           return sum + monthlyAmount;
         }, 0);
-      
-      setTotalMonthlyIncome(total);
+
+      const totalRevenue = totalIncomePanel + totalInvestmentYields + totalDividends + totalRentalIncome + totalOneOff;
+      setTotalMonthlyIncome(totalRevenue);
+
+      // 8. Calcular custos agregados
+      const totalCostsCalc = totalVehicleDepreciation + totalIpva + totalIptu + totalRetirement;
+      setTotalCosts(totalCostsCalc);
+
+      // 9. Saldo líquido
+      setNetBalance(totalRevenue - totalCostsCalc);
     } catch (error) {
-      console.error('Error fetching income sources:', error);
+      console.error('Erro ao buscar dados financeiros:', error);
     } finally {
       setLoading(false);
     }
@@ -412,42 +506,50 @@ export default function RevenueManagement() {
       )}
 
       {/* Summary Cards - limpos sem informação de período */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-2xl text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-100 text-sm font-medium">Renda Mensal</p>
+              <p className="text-green-100 text-sm font-medium">Receita Total</p>
               <p className="text-3xl font-bold mt-1">{formatCurrency(totalMonthlyIncome)}</p>
+              <p className="text-green-100 text-xs mt-1">Inclui painel, dividendos, rendimentos, aluguel, transações únicas</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <DollarSign className="h-6 w-6" />
             </div>
           </div>
         </div>
-
+        <div className="bg-gradient-to-br from-red-500 to-red-600 p-6 rounded-2xl text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-red-100 text-sm font-medium">Custos Totais</p>
+              <p className="text-3xl font-bold mt-1">{formatCurrency(totalCosts)}</p>
+              <p className="text-red-100 text-xs mt-1">Depreciação, IPVA, IPTU, previdência</p>
+            </div>
+            <div className="bg-white/20 p-3 rounded-xl">
+              <Receipt className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm font-medium">Renda Anual</p>
-              <p className="text-3xl font-bold mt-1">{formatCurrency(calculateTotalYearlyIncome())}</p>
+              <p className="text-3xl font-bold mt-1 pr-2">{formatCurrency(totalMonthlyIncome * 12)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <TrendingUp className="h-6 w-6" />
             </div>
           </div>
         </div>
-
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-purple-100 text-sm font-medium">Fontes Ativas</p>
-              <p className="text-3xl font-bold mt-1">{incomeSources.filter(s => s.is_active).length}</p>
-              <p className="text-purple-100 text-sm">{incomeSources.length} Total no período</p>
+              <p className="text-purple-100 text-sm font-medium">Saldo Líquido</p>
+              <p className="text-3xl font-bold mt-1">{formatCurrency(netBalance)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
-              <div className="h-6 w-6 flex items-center justify-center text-white font-bold">
-                {incomeSources.filter(s => s.is_active).length}
-              </div>
+              <DollarSign className="h-6 w-6" />
             </div>
           </div>
         </div>

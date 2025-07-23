@@ -19,6 +19,11 @@ interface IncomeSource {
 export default function Income() {
   const { user } = useAuth();
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
+  const [investmentYields, setInvestmentYields] = useState<number>(0);
+  const [dividends, setDividends] = useState<number>(0);
+  const [rentalIncome, setRentalIncome] = useState<number>(0);
+  const [oneOffTransactions, setOneOffTransactions] = useState<number>(0);
+  const [totalMonthlyIncome, setTotalMonthlyIncome] = useState<number>(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<IncomeSource>>({});
@@ -34,23 +39,94 @@ export default function Income() {
   });
 
   useEffect(() => {
-    fetchIncomeSources();
+    fetchAllIncomeData();
   }, [user]);
 
-  const fetchIncomeSources = async () => {
+  // Busca e agrega todas as receitas relevantes
+  const fetchAllIncomeData = async () => {
     if (!user) return;
-    
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. Income Sources
+      const { data: incomeSourcesData, error: incomeError } = await supabase
         .from('income_sources')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+      if (incomeError) throw incomeError;
+      setIncomeSources(incomeSourcesData || []);
 
-      if (error) throw error;
-      setIncomeSources(data || []);
+      // 2. Investments (rendimentos, dividendos)
+      const { data: investmentsData } = await supabase
+        .from('investments')
+        .select('yield, dividends')
+        .eq('user_id', user.id);
+      let totalInvestmentYields = 0;
+      let totalDividends = 0;
+      if (investmentsData && investmentsData.length > 0) {
+        investmentsData.forEach((inv: any) => {
+          totalInvestmentYields += Number(inv.yield || 0);
+          totalDividends += Number(inv.dividends || 0);
+        });
+      }
+      setInvestmentYields(totalInvestmentYields);
+      setDividends(totalDividends);
+
+      // 3. Real Estate (rental income)
+      const { data: realEstateData } = await supabase
+        .from('real_estate')
+        .select('rental_income, is_rented')
+        .eq('user_id', user.id);
+      let totalRentalIncome = 0;
+      if (realEstateData && realEstateData.length > 0) {
+        realEstateData.forEach((re: any) => {
+          if (re.is_rented) {
+            totalRentalIncome += Number(re.rental_income || 0);
+          }
+        });
+      }
+      setRentalIncome(totalRentalIncome);
+
+      // 4. One-off transactions (transações únicas)
+      const { data: transactionsData } = await supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id);
+      let totalOneOff = 0;
+      if (transactionsData && transactionsData.length > 0) {
+        transactionsData.forEach((t: any) => {
+          if (t.type === 'one-time') {
+            totalOneOff += Number(t.amount || 0);
+          }
+        });
+      }
+      setOneOffTransactions(totalOneOff);
+
+      // 5. Calcular total de receitas agregadas
+      const totalIncomePanel = (incomeSourcesData || [])
+        .filter((source: any) => source.is_active)
+        .reduce((sum: number, source: any) => {
+          let monthlyAmount = source.amount;
+          switch (source.frequency) {
+            case 'weekly':
+              monthlyAmount = source.amount * 4.33;
+              break;
+            case 'yearly':
+              monthlyAmount = source.amount / 12;
+              break;
+            case 'one-time':
+              monthlyAmount = source.amount;
+              break;
+            default:
+              monthlyAmount = source.amount;
+          }
+          return sum + monthlyAmount;
+        }, 0);
+
+      const totalRevenue = totalIncomePanel + totalInvestmentYields + totalDividends + totalRentalIncome + totalOneOff;
+      setTotalMonthlyIncome(totalRevenue);
     } catch (err) {
-      console.error('Error fetching income sources:', err);
+      console.error('Erro ao buscar receitas:', err);
       setError('Failed to load income sources');
     } finally {
       setLoading(false);
@@ -175,7 +251,7 @@ export default function Income() {
       setTaxAmount(0);
       setShowTaxInfo(false);
       setFormData({ amount: '', frequency: 'monthly', taxRate: '' });
-      fetchIncomeSources();
+      fetchAllIncomeData();
     } catch (err) {
       console.error('Error adding income:', err);
       setError('Failed to add income source');
@@ -208,7 +284,7 @@ export default function Income() {
       
       setEditingId(null);
       setEditForm({});
-      fetchIncomeSources();
+      fetchAllIncomeData();
     } catch (err) {
       console.error('Error updating income:', err);
       setError('Failed to update income source');
@@ -225,7 +301,7 @@ export default function Income() {
         .eq('id', id);
 
       if (error) throw error;
-      fetchIncomeSources();
+      fetchAllIncomeData();
     } catch (err) {
       console.error('Error deleting income:', err);
       setError('Failed to delete income source');
@@ -240,25 +316,9 @@ export default function Income() {
   };
 
   // Calcular total de receita - INCLUINDO transações únicas (igual ao RevenueManagement)
+  // Total mensal agregado (painel + extras)
   const calculateTotalIncome = () => {
-    return incomeSources.reduce((total, source) => {
-      if (!source.is_active) return total;
-      
-      let monthlyAmount = source.amount;
-      switch (source.frequency) {
-        case 'weekly':
-          monthlyAmount = source.amount * 4.33;
-          break;
-        case 'yearly':
-          monthlyAmount = source.amount / 12;
-          break;
-        case 'one-time':
-          // INCLUIR transações únicas (igual ao Dashboard e RevenueManagement)
-          monthlyAmount = source.amount;
-          break;
-      }
-      return total + monthlyAmount;
-    }, 0);
+    return totalMonthlyIncome;
   };
 
   if (loading) {
@@ -293,43 +353,60 @@ export default function Income() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-blue-600 p-6 rounded-xl text-white shadow-md">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <p className="text-white/80 text-sm font-medium">Renda Mensal Total</p>
+              <p className="text-white/80 text-sm font-medium">Receita Total</p>
               <p className="text-3xl font-bold mt-1">{formatCurrency(calculateTotalIncome())}</p>
-              <p className="text-white/80 text-xs mt-1">Incluindo transações únicas</p>
+              <p className="text-white/80 text-xs mt-1">Inclui painel, dividendos, rendimentos, aluguel, transações únicas</p>
             </div>
             <div className="bg-white/20 p-3 rounded-lg">
               <TrendingUp className="h-6 w-6" />
             </div>
           </div>
         </div>
-
         <div className="bg-blue-600 p-6 rounded-xl text-white shadow-md">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/80 text-sm font-medium">Fontes Ativas</p>
-              <p className="text-3xl font-bold mt-1">{incomeSources.filter(s => s.is_active).length}</p>
-              <p className="text-white/80 text-sm">
-                {incomeSources.filter(s => s.frequency === 'monthly' && s.is_active).length} mensais, 
-                {incomeSources.filter(s => s.frequency === 'yearly' && s.is_active).length} anuais, 
-                {incomeSources.filter(s => s.frequency === 'one-time' && s.is_active).length} únicas
-              </p>
+              <p className="text-white/80 text-sm font-medium">Painel</p>
+              <p className="text-3xl font-bold mt-1">{formatCurrency(
+                incomeSources.filter(s => s.is_active).reduce((total, source) => {
+                  let monthlyAmount = source.amount;
+                  switch (source.frequency) {
+                    case 'weekly': monthlyAmount = source.amount * 4.33; break;
+                    case 'yearly': monthlyAmount = source.amount / 12; break;
+                    case 'one-time': monthlyAmount = source.amount; break;
+                    default: monthlyAmount = source.amount;
+                  }
+                  return total + monthlyAmount;
+                }, 0)
+              )}</p>
+              <p className="text-white/80 text-xs mt-1">Fontes cadastradas</p>
             </div>
             <div className="bg-white/20 p-3 rounded-lg">
               <DollarSign className="h-6 w-6" />
             </div>
           </div>
         </div>
-
+        <div className="bg-blue-600 p-6 rounded-xl text-white shadow-md">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/80 text-sm font-medium">Dividendos/Rendimentos</p>
+              <p className="text-3xl font-bold mt-1">{formatCurrency(dividends + investmentYields)}</p>
+              <p className="text-white/80 text-xs mt-1">Investimentos</p>
+            </div>
+            <div className="bg-white/20 p-3 rounded-lg">
+              <TrendingUp className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
         <div className="bg-purple-600 p-6 rounded-xl text-white shadow-md">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/80 text-sm font-medium">Próximos Pagamentos</p>
-              <p className="text-3xl font-bold mt-1">{incomeSources.filter(s => s.next_payment && s.is_active).length}</p>
-              <p className="text-white/80 text-sm">Nos próximos 30 dias</p>
+              <p className="text-white/80 text-sm font-medium">Aluguel/Únicas</p>
+              <p className="text-3xl font-bold mt-1">{formatCurrency(rentalIncome + oneOffTransactions)}</p>
+              <p className="text-white/80 text-xs mt-1">Aluguel e transações únicas</p>
             </div>
             <div className="bg-white/20 p-3 rounded-lg">
               <Calendar className="h-6 w-6" />
