@@ -662,13 +662,13 @@ export default function Employees() {
                           type="text"
                           value={editForm.name || ''}
                           onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                           placeholder="Nome completo"
                         />
                         <select
                           value={editForm.role || ''}
                           onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                         >
                           {employeeRoles.map(role => (
                             <option key={role.value} value={role.value}>
@@ -682,14 +682,14 @@ export default function Employees() {
                           type="number"
                           value={editForm.salary || ''}
                           onChange={(e) => setEditForm({ ...editForm, salary: Number(e.target.value) })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                           placeholder="Salário"
                           step="0.01"
                         />
                         <select
                           value={editForm.status || ''}
                           onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                         >
                           {employeeStatuses.map(status => (
                             <option key={status.value} value={status.value}>
@@ -701,7 +701,7 @@ export default function Employees() {
                           type="date"
                           value={editForm.next_vacation || ''}
                           onChange={(e) => setEditForm({ ...editForm, next_vacation: e.target.value })}
-                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                           placeholder="Próximas férias"
                         />
                       </div>
@@ -988,13 +988,13 @@ export default function Employees() {
                     name="name"
                     placeholder="Nome completo"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   />
                   
                   <select
                     name="role"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   >
                     <option value="">Função</option>
                     {employeeRoles.map(role => (
@@ -1010,7 +1010,7 @@ export default function Employees() {
                     <select
                       name="document_type"
                       required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                     >
                       <option value="">Tipo de Documento</option>
                       {documentTypes.map(type => (
@@ -1026,7 +1026,7 @@ export default function Employees() {
                     name="document_number"
                     placeholder="Número do documento"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   />
                 </div>
                 
@@ -1036,7 +1036,7 @@ export default function Employees() {
                     name="address"
                     placeholder="Endereço completo"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   />
                 </div>
                 
@@ -1046,14 +1046,14 @@ export default function Employees() {
                     name="phone"
                     placeholder="Telefone"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   />
                   
                   <input
                     type="email"
                     name="email"
                     placeholder="Email"
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   />
                 </div>
               </div>
@@ -1068,7 +1068,7 @@ export default function Employees() {
                       type="date"
                       name="hiring_date"
                       required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                     />
                   </div>
                   
@@ -1078,7 +1078,7 @@ export default function Employees() {
                     placeholder="Salário (R$)"
                     step="0.01"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   />
                 </div>
               </div>
@@ -1094,9 +1094,8 @@ export default function Employees() {
                       name="fgts_percentage"
                       placeholder="% do FGTS"
                       step="0.01"
-                      defaultValue="8"
                       required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                     />
                   </div>
                   
@@ -1107,9 +1106,8 @@ export default function Employees() {
                       name="inss_percentage"
                       placeholder="% do INSS"
                       step="0.01"
-                      defaultValue="11"
                       required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                     />
                   </div>
                   
@@ -1120,8 +1118,7 @@ export default function Employees() {
                       name="irrf_percentage"
                       placeholder="% do IRRF"
                       step="0.01"
-                      defaultValue="0"
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                     />
                   </div>
                 </div>
@@ -1133,8 +1130,7 @@ export default function Employees() {
                     name="other_benefits"
                     placeholder="Valor de outros benefícios (VR, VT, etc.)"
                     step="0.01"
-                    defaultValue="0"
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-black"
                   />
                 </div>
               </div>
