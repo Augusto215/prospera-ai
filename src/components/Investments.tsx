@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import DateRangeSelector from './DateRangeSelector';
 
+// Interface Investment corrigida - com todos os campos da tabela
 interface Investment {
   id: string;
   type: 'renda-fixa' | 'acoes' | 'fundos-imobiliarios' | 'private-equity' | 'titulos-credito';
@@ -44,7 +45,7 @@ export default function Investments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string>('');
-  
+
   // Configuração inicial das datas - igual ao RevenueManagement
   const [startDate, setStartDate] = useState<string>(() => {
     const date = new Date();
@@ -54,7 +55,7 @@ export default function Investments() {
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
-  
+
   const [formData, setFormData] = useState({
     quantity: '',
     current_price: '',
@@ -79,25 +80,25 @@ export default function Investments() {
 
   const calculateMonthlyIncome = (investment: Investment) => {
     let calculatedIncome = 0;
-    
+
     // Para ações e FIIs, usar dividend yield
     if (requiresDividendYield(investment.type) && investment.dividend_yield) {
-      const currentValue = investment.quantity && investment.current_price 
-        ? investment.quantity * investment.current_price 
+      const currentValue = investment.quantity && investment.current_price
+        ? investment.quantity * investment.current_price
         : investment.amount;
       calculatedIncome = (currentValue * investment.dividend_yield) / 100 / 12;
     }
-    
+
     // Para renda fixa e outros, usar taxa de juros
     if (requiresInterestRate(investment.type) && investment.interest_rate && investment.amount) {
       calculatedIncome = (investment.amount * investment.interest_rate) / 100 / 12;
     }
-    
+
     // Fallback para renda mensal manual
     if (investment.monthly_income) {
       calculatedIncome = investment.monthly_income;
     }
-    
+
     return calculatedIncome;
   };
 
@@ -107,11 +108,11 @@ export default function Investments() {
       const purchaseValue = investment.quantity * investment.purchase_price;
       return currentValue - purchaseValue;
     }
-    
+
     if (investment.current_price && investment.purchase_price) {
       return investment.current_price - investment.purchase_price;
     }
-    
+
     return 0;
   };
 
@@ -148,6 +149,65 @@ export default function Investments() {
     }
   };
 
+
+// Função fetchInvestments corrigida - com todos os campos da tabela
+const fetchInvestments = async () => {
+  setLoading(true);
+  try {
+    // Buscar investimentos com filtro de data baseado na purchase_date
+    const { data, error } = await supabase
+      .from('investments')
+      .select('id, name, type, broker, amount, purchase_price, current_price, interest_rate, monthly_income, purchase_date, maturity_date, quantity, dividend_yield, tax_rate, created_at, updated_at')
+      .eq('user_id', user?.id)
+      .gte('purchase_date', startDate)
+      .lte('purchase_date', endDate + 'T23:59:59.999Z') // Incluir o dia completo
+      .order('created_at', { ascending: false }); // Voltando para created_at
+
+    if (error) throw error;
+    setInvestments(data || []);
+  } catch (err) {
+    console.error('Error fetching investments:', err);
+    setError('Erro ao carregar investimentos');
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Função handleSaveEdit corrigida - mantendo updated_at
+const handleSaveEdit = async () => {
+  if (!editingId) return;
+
+  try {
+    // Recalcular amount se for ações/FIIs e tiver quantidade e preço atual
+    if (requiresQuantity(editForm.type || '') && editForm.quantity && editForm.current_price) {
+      editForm.amount = editForm.quantity * editForm.current_price;
+    }
+
+    // Recalcular taxa de imposto
+    if (editForm.type) {
+      const monthlyIncome = editForm.monthly_income || 0;
+      editForm.tax_rate = calculateTaxRate(editForm.type, monthlyIncome);
+    }
+
+    const { error } = await supabase
+      .from('investments')
+      .update({
+        ...editForm,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', editingId);
+
+    if (error) throw error;
+    
+    setEditingId(null);
+    setEditForm({});
+    fetchInvestments();
+  } catch (err) {
+    console.error('Error updating investment:', err);
+    setError('Erro ao atualizar investimento');
+  }
+};
+
   // useEffect com dependências das datas - igual ao RevenueManagement
   useEffect(() => {
     if (user) {
@@ -168,7 +228,7 @@ export default function Investments() {
     if (requiresDividendYield(selectedType) && formData.dividend_yield && formData.amount) {
       const monthlyIncome = (Number(formData.amount) * Number(formData.dividend_yield)) / 100 / 12;
       setFormData(prev => ({ ...prev, calculated_monthly_income: monthlyIncome.toFixed(2) }));
-      
+
       // Calcular taxa de imposto
       const taxRate = calculateTaxRate(selectedType, monthlyIncome);
       setFormData(prev => ({ ...prev, tax_rate: taxRate.toString() }));
@@ -184,29 +244,6 @@ export default function Investments() {
       setFormData(prev => ({ ...prev, tax_rate: taxRate.toString() }));
     }
   }, [selectedType]);
-
-  // Função fetchInvestments modificada para usar filtragem por data - igual ao RevenueManagement
-  const fetchInvestments = async () => {
-    setLoading(true);
-    try {
-      // Buscar investimentos com filtro de data baseado na purchase_date
-      const { data, error } = await supabase
-        .from('investments')
-        .select('id, name, type, broker, amount, purchase_price, current_price, interest_rate, monthly_income, purchase_date, maturity_date, quantity, dividend_yield, tax_rate, created_at, updated_at')
-        .eq('user_id', user?.id)
-        .gte('purchase_date', startDate)
-        .lte('purchase_date', endDate + 'T23:59:59.999Z') // Incluir o dia completo
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setInvestments(data || []);
-    } catch (err) {
-      console.error('Error fetching investments:', err);
-      setError('Erro ao carregar investimentos');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAddInvestment = async (investmentData: Omit<Investment, 'id' | 'created_at' | 'updated_at'>) => {
     try {
@@ -236,6 +273,7 @@ export default function Investments() {
     }
   };
 
+
   const handleEditInvestment = (investment: Investment) => {
     setEditingId(investment.id);
     setEditForm({
@@ -253,40 +291,6 @@ export default function Investments() {
       quantity: investment.quantity,
       tax_rate: investment.tax_rate
     });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingId) return;
-
-    try {
-      // Recalcular amount se for ações/FIIs e tiver quantidade e preço atual
-      if (requiresQuantity(editForm.type || '') && editForm.quantity && editForm.current_price) {
-        editForm.amount = editForm.quantity * editForm.current_price;
-      }
-
-      // Recalcular taxa de imposto
-      if (editForm.type) {
-        const monthlyIncome = editForm.monthly_income || 0;
-        editForm.tax_rate = calculateTaxRate(editForm.type, monthlyIncome);
-      }
-
-      const { error } = await supabase
-        .from('investments')
-        .update({
-          ...editForm,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingId);
-
-      if (error) throw error;
-      
-      setEditingId(null);
-      setEditForm({});
-      fetchInvestments();
-    } catch (err) {
-      console.error('Error updating investment:', err);
-      setError('Erro ao atualizar investimento');
-    }
   };
 
   const handleCancelEdit = () => {
@@ -329,13 +333,13 @@ export default function Investments() {
 
   const totalMonthlyIncome = investments.reduce((sum, inv) => sum + calculateMonthlyIncome(inv), 0);
   const totalCapitalGain = investments.reduce((sum, inv) => sum + calculateCapitalGain(inv), 0);
-  
+
   // Calcular total de impostos
   const totalTaxes = investments.reduce((sum, inv) => {
     const monthlyIncome = calculateMonthlyIncome(inv);
     return sum + (monthlyIncome * (inv.tax_rate || 0) / 100);
   }, 0);
-  
+
   // Calcular rentabilidade total
   const totalReturn = totalCurrentValue - totalInvested;
   const returnPercentage = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
@@ -346,11 +350,11 @@ export default function Investments() {
 
   const handleTypeSelection = (type: string) => {
     setSelectedType(type);
-    setFormData({ 
-      quantity: '', 
-      current_price: '', 
-      amount: '', 
-      dividend_yield: '', 
+    setFormData({
+      quantity: '',
+      current_price: '',
+      amount: '',
+      dividend_yield: '',
       calculated_monthly_income: '',
       tax_rate: calculateTaxRate(type).toString()
     });
@@ -373,15 +377,15 @@ export default function Investments() {
           <p className="text-gray-500 mt-1 text-sm sm:text-base">Gerencie sua carteira de investimentos</p>
         </div>
         <div className="flex space-x-3">
-          <DateRangeSelector 
+          <DateRangeSelector
             startDate={startDate}
             endDate={endDate}
             onRangeChange={(start, end) => {
               setStartDate(start);
               setEndDate(end);
-            }} 
+            }}
           />
-          <button 
+          <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 shadow-md text-sm sm:text-base"
           >
@@ -507,7 +511,7 @@ export default function Investments() {
             </div>
           </div>
         </div>
-        
+
         <div className="divide-y divide-gray-100">
           {investments.length === 0 ? (
             <div className="p-8 sm:p-12 text-center">
@@ -524,25 +528,25 @@ export default function Investments() {
             investments.map((investment) => {
               // Calcular valor atual corretamente
               let currentValue;
-              if ((investment.type === 'acoes' || investment.type === 'fundos-imobiliarios') && 
-                  investment.quantity && investment.current_price) {
+              if ((investment.type === 'acoes' || investment.type === 'fundos-imobiliarios') &&
+                investment.quantity && investment.current_price) {
                 currentValue = investment.quantity * investment.current_price;
               } else {
                 currentValue = investment.current_price || investment.purchase_price || investment.amount;
               }
-              
+
               // Calcular valor de compra corretamente
               let purchaseValue;
-              if ((investment.type === 'acoes' || investment.type === 'fundos-imobiliarios') && 
-                  investment.quantity && investment.purchase_price) {
+              if ((investment.type === 'acoes' || investment.type === 'fundos-imobiliarios') &&
+                investment.quantity && investment.purchase_price) {
                 purchaseValue = investment.quantity * investment.purchase_price;
               } else {
                 purchaseValue = investment.amount;
               }
-              
+
               const profit = currentValue - purchaseValue;
               const profitPercentage = ((profit / purchaseValue) * 100);
-              
+
               // Calcular renda mensal
               let monthlyIncome = 0;
               if (investment.type === 'acoes' || investment.type === 'fundos-imobiliarios') {
@@ -554,10 +558,10 @@ export default function Investments() {
               } else if (investment.monthly_income) {
                 monthlyIncome = investment.monthly_income;
               }
-              
+
               // Calcular imposto
               const taxAmount = investment.tax_rate ? (monthlyIncome * investment.tax_rate / 100) : 0;
-              
+
               return (
                 <div key={investment.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-200">
                   {editingId === investment.id ? (
@@ -675,7 +679,7 @@ export default function Investments() {
                         <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${getTypeColor(investment.type)}`}>
                           <Building className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
                         </div>
-                        
+
                         <div>
                           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                             <h3 className="font-medium text-gray-800 text-sm sm:text-base">{investment.name}</h3>
@@ -694,7 +698,7 @@ export default function Investments() {
                               </span>
                             )}
                           </div>
-                          
+
                           <div className="flex flex-wrap items-center gap-2 mt-1">
                             <span className="text-xs sm:text-sm text-gray-500">{investment.broker}</span>
                             <span className="text-gray-300 hidden sm:inline">•</span>
@@ -716,7 +720,7 @@ export default function Investments() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="text-right">
                         <div className="flex items-center space-x-4">
                           <div>
@@ -733,15 +737,15 @@ export default function Investments() {
                               </p>
                             )}
                           </div>
-                          
+
                           <div className="flex items-center space-x-2">
-                            <button 
+                            <button
                               onClick={() => handleEditInvestment(investment)}
                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleDeleteInvestment(investment.id)}
                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
                             >
@@ -766,7 +770,7 @@ export default function Investments() {
             <div className="p-4 sm:p-6 border-b border-gray-100">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Novo Investimento</h2>
             </div>
-            
+
             <div className="p-4 sm:p-6 space-y-6">
               {/* Primeira etapa: Seleção do tipo */}
               <div>
@@ -777,11 +781,10 @@ export default function Investments() {
                       key={type.value}
                       type="button"
                       onClick={() => handleTypeSelection(type.value)}
-                      className={`p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                        selectedType === type.value
+                      className={`p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 text-left ${selectedType === type.value
                           ? 'border-green-500 bg-green-50 shadow-lg'
                           : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
+                        }`}
                     >
                       <div className={`w-8 h-8 rounded-lg ${type.color} flex items-center justify-center mb-2`}>
                         <Building className="h-4 w-4 text-white" />
@@ -800,7 +803,7 @@ export default function Investments() {
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   const formDataObj = new FormData(e.currentTarget);
-                  
+
                   // Validar campos obrigatórios para ações e FIIs
                   if (requiresQuantity(selectedType)) {
                     if (!formDataObj.get('quantity')) {
@@ -814,13 +817,13 @@ export default function Investments() {
                   }
 
                   // Para ações e FIIs, usar o valor calculado automaticamente
-                  const amount = requiresQuantity(selectedType) && formData.amount 
+                  const amount = requiresQuantity(selectedType) && formData.amount
                     ? Number(formData.amount)
                     : Number(formDataObj.get('amount'));
-                  
+
                   // Usar a taxa de imposto calculada
                   const taxRate = formData.tax_rate ? Number(formData.tax_rate) : calculateTaxRate(selectedType);
-                  
+
                   handleAddInvestment({
                     type: selectedType as any,
                     name: formDataObj.get('name') as string,
@@ -839,7 +842,7 @@ export default function Investments() {
                 }} className="space-y-4">
                   <div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">2. Informações do investimento</h3>
-                    
+
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <input
@@ -849,7 +852,7 @@ export default function Investments() {
                           required
                           className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm sm:text-base bg-white text-black"
                         />
-                        
+
                         <select
                           name="broker"
                           required
@@ -863,7 +866,7 @@ export default function Investments() {
                           ))}
                         </select>
                       </div>
-                      
+
                       {requiresQuantity(selectedType) ? (
                         // Layout para ações e FIIs
                         <div className="space-y-4">
@@ -889,7 +892,7 @@ export default function Investments() {
                               className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm sm:text-base bg-white text-black"
                             />
                           </div>
-                          
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <input
                               type="number"
@@ -919,7 +922,7 @@ export default function Investments() {
                               onChange={(e) => handleFormDataChange('dividend_yield', e.target.value)}
                               className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm sm:text-base bg-white text-black"
                             />
-                            
+
                             {formData.calculated_monthly_income && (
                               <div className="bg-green-50 p-3 rounded-xl border border-green-200">
                                 <p className="text-xs sm:text-sm text-green-700">
@@ -930,7 +933,7 @@ export default function Investments() {
                                 </p>
                               </div>
                             )}
-                            
+
                             {formData.tax_rate && Number(formData.tax_rate) > 0 && (
                               <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200">
                                 <div className="flex items-center space-x-2">
@@ -973,7 +976,7 @@ export default function Investments() {
                               className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm sm:text-base bg-white text-black"
                             />
                           </div>
-                          
+
                           {formData.tax_rate && Number(formData.tax_rate) > 0 && (
                             <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200">
                               <div className="flex items-center space-x-2">
@@ -983,7 +986,7 @@ export default function Investments() {
                                 </p>
                               </div>
                               <p className="text-xs text-indigo-600 mt-1">
-                                {selectedType === 'renda-fixa' 
+                                {selectedType === 'renda-fixa'
                                   ? 'Renda fixa tem imposto regressivo de 22.5% a 15% conforme o prazo'
                                   : 'Esta taxa será aplicada sobre os rendimentos mensais'}
                               </p>
@@ -991,7 +994,7 @@ export default function Investments() {
                           )}
                         </div>
                       )}
-                      
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Data de compra</label>
@@ -1002,7 +1005,7 @@ export default function Investments() {
                             className="w-full p-2 sm:p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm sm:text-base bg-white text-black"
                           />
                         </div>
-                        
+
                         <div>
                           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Vencimento (opcional)</label>
                           <input
@@ -1014,18 +1017,18 @@ export default function Investments() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex space-x-3 pt-4">
                     <button
                       type="button"
                       onClick={() => {
                         setShowAddModal(false);
                         setSelectedType('');
-                        setFormData({ 
-                          quantity: '', 
-                          current_price: '', 
-                          amount: '', 
-                          dividend_yield: '', 
+                        setFormData({
+                          quantity: '',
+                          current_price: '',
+                          amount: '',
+                          dividend_yield: '',
                           calculated_monthly_income: '',
                           tax_rate: ''
                         });
